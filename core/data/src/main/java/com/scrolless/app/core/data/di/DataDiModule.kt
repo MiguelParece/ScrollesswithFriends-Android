@@ -71,6 +71,7 @@ object DataDiModule {
                 ScrollessDatabase.MIGRATION_7_8,
                 ScrollessDatabase.MIGRATION_8_9,
                 ScrollessDatabase.MIGRATION_9_10,
+                ScrollessDatabase.MIGRATION_10_11,
             ).fallbackToDestructiveMigration(true) // Not recommended but for now it shouldn't matter
             .fallbackToDestructiveMigrationOnDowngrade(true).addCallback(
                 object : RoomDatabase.Callback() {
@@ -89,10 +90,12 @@ object DataDiModule {
                                                    pause_duration_millis, except_reels_sent_by_dm,
                                                    partner_quota_window_key, partner_quota_used_millis,
                                                    partner_quota_granted_millis, partner_quota_anchor_wall,
-                                                   partner_quota_anchor_elapsed, partner_quota_anchor_boot)
+                                                   partner_quota_anchor_elapsed, partner_quota_anchor_boot,
+                                                   strict_until_at, strict_anchor_wall,
+                                                   strict_anchor_elapsed, strict_anchor_boot)
                         VALUES (1, 'NothingSelected', 0, 0, 0, 0, 0, 0, 100, 0, 0, 0,
                                 CAST(strftime('%s','now') AS INTEGER) * 1000, 0, 0, 0, 300000, 0,
-                                '', 0, 0, 0, 0, -1)
+                                '', 0, 0, 0, 0, -1, 0, 0, 0, -1)
                         """,
                         )
                     }

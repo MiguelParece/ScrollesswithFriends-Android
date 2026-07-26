@@ -51,6 +51,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,8 +72,10 @@ import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.SETTINGS_TRANSITION_KEY
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.designsystem.util.rememberHapticHelper
+import com.scrolless.app.designsystem.util.toIntervalLabel
 import com.scrolless.app.feature.settings.gift.GiftViewModel
 import com.scrolless.app.feature.settings.gift.SendGiftDialog
+import com.scrolless.app.feature.settings.strict.StrictModeDialog
 import kotlin.math.roundToInt
 
 @Composable
@@ -93,6 +96,7 @@ fun SettingsScreen(
         onTimerOverlayEnabledChange = viewModel::onTimerOverlayEnabledChange,
         onNavigateBack = onNavigateBack,
         onSendGiftClick = giftViewModel::onCreateGift,
+        onArmStrictMode = viewModel::onArmStrictMode,
     )
 
     giftCode?.let { code ->
@@ -113,7 +117,9 @@ private fun SettingsScreenContent(
     onTimerOverlayEnabledChange: (Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     onSendGiftClick: () -> Unit = {},
+    onArmStrictMode: (Long) -> Unit = {},
 ) {
+    var showStrictDialog by remember { mutableStateOf(false) }
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
     val hapticHelper = rememberHapticHelper()
@@ -215,9 +221,52 @@ private fun SettingsScreenContent(
                     onClick = onSendGiftClick,
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            SettingsSectionLabel(stringResource(R.string.settings_section_strict_mode))
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            SettingsGroup {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_strict_title),
+                    description = if (uiState.strictModeArmed) {
+                        stringResource(
+                            R.string.settings_strict_description_armed,
+                            formatStrictUntil(uiState.strictModeUntilMillis),
+                            uiState.strictModeRemainingMillis.toIntervalLabel(),
+                        )
+                    } else {
+                        stringResource(R.string.settings_strict_description_off)
+                    },
+                    onClick = { showStrictDialog = true },
+                )
+            }
         }
     }
+
+    if (showStrictDialog) {
+        StrictModeDialog(
+            armed = uiState.strictModeArmed,
+            remainingMillis = uiState.strictModeRemainingMillis,
+            onConfirm = { durationMillis ->
+                onArmStrictMode(durationMillis)
+                showStrictDialog = false
+            },
+            onDismiss = { showStrictDialog = false },
+        )
+    }
 }
+
+private fun formatStrictUntil(untilMillis: Long): String = java.time.Instant.ofEpochMilli(untilMillis)
+    .atZone(java.time.ZoneId.systemDefault())
+    .format(
+        java.time.format.DateTimeFormatter.ofLocalizedDateTime(
+            java.time.format.FormatStyle.MEDIUM,
+            java.time.format.FormatStyle.SHORT,
+        ),
+    )
 
 @Composable
 private fun SettingsNavigationItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {

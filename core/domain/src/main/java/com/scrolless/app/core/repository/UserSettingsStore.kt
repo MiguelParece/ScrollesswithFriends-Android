@@ -87,6 +87,12 @@ interface UserSettingsStore {
         anchorBootCount: Int,
     )
     suspend fun addPartnerQuotaGrant(deltaMillis: Long)
+
+    fun getStrictUntil(): Flow<Long>
+    fun getStrictAnchorWall(): Flow<Long>
+    fun getStrictAnchorElapsed(): Flow<Long>
+    fun getStrictAnchorBoot(): Flow<Int>
+    suspend fun updateStrictModeState(strictUntilAt: Long, anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int)
 }
 
 suspend fun UserSettingsStore.setTimerOverlayPosition(positionX: Int, positionY: Int) {

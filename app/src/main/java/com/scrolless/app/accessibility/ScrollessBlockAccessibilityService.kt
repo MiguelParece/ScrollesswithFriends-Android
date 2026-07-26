@@ -24,16 +24,21 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
+import com.scrolless.app.R
 import com.scrolless.app.core.blocking.BlockingManager
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockableApp
 import com.scrolless.app.core.model.BlockingResult
 import com.scrolless.app.core.model.DetectionMethod
 import com.scrolless.app.core.model.ResolvedBlockableApp
+import com.scrolless.app.core.model.StrictModeState
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
+import com.scrolless.app.core.strict.StrictModeManager
 import com.scrolless.app.ui.overlay.TimerOverlayManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -121,6 +126,13 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var timerOverlayManager: TimerOverlayManager
 
+    /**
+     * Owns the strict-mode time lock; while armed, system screens that could disable
+     * Scrolless are closed automatically.
+     */
+    @Inject
+    lateinit var strictModeManager: StrictModeManager
+
     private val powerManager by lazy { getSystemService(POWER_SERVICE) as PowerManager }
 
     private data class DetectedBlockedContent(val app: ResolvedBlockableApp, val blockingSuppressed: Boolean)
@@ -150,6 +162,16 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      */
     @Volatile
     private var pauseUntilMillis: Long = 0L
+
+    /**
+     * Latest persisted strict-mode state, updated reactively.
+     */
+    @Volatile
+    private var strictModeState: StrictModeState = StrictModeState.EMPTY
+
+    private var lastStrictKickElapsed: Long = 0L
+
+    private val appLabel by lazy { getString(R.string.app_name) }
 
     private fun isPauseActive(now: Long = System.currentTimeMillis()): Boolean = pauseUntilMillis > now
 
@@ -269,6 +291,16 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             userSettingsStore.getExceptReelsSentByDm().collect { currentExceptReelsSentByDm = it }
         }
 
+        // Observe strict mode state: keep the guard's snapshot fresh, re-anchor after
+        // reboots, and widen/narrow the package filter when the lock arms or expires.
+        serviceScope.launch {
+            strictModeManager.observeState().collect { state ->
+                strictModeState = state
+                strictModeManager.reanchorIfNeeded()
+                refreshServiceConfig()
+            }
+        }
+
         // Observe pause toggle
         serviceScope.launch {
             userSettingsStore.getPauseUntil().collect { newPauseUntil ->
@@ -376,6 +408,12 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         val packageId = event.packageName?.toString() ?: ""
         val userActiveApp = resolveForegroundBrainRotApp(packageId)
         updateForegroundAppState(userActiveApp)
+
+        // While strict mode is armed, screens that could disable Scrolless are closed.
+        if (packageId in STRICT_GUARD_PACKAGES && strictModeManager.isArmed(strictModeState)) {
+            handleStrictGuardEvent()
+            return
+        }
 
         // For unrelated apps, avoid touching the accessibility tree unless we're already tracking
         // blocked content.
@@ -765,10 +803,48 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             // Ensure windows are available for visibility-based exit checks.
             info.flags = info.flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         } else {
-            info.packageNames = BlockableApp.entries.flatMap { it.getPackageIds() }.toTypedArray()
+            // While strict mode is armed, guarded system packages stay in the filter so
+            // disable/uninstall screens keep producing events.
+            info.packageNames = buildList {
+                addAll(BlockableApp.entries.flatMap { it.getPackageIds() })
+                if (strictModeManager.isArmed(strictModeState)) {
+                    addAll(STRICT_GUARD_PACKAGES)
+                }
+            }.toTypedArray()
             Timber.d("Restricted service configuration to target packages only")
         }
         serviceInfo = info
+    }
+
+    /**
+     * Closes the current guarded system screen when it shows Scrolless — the accessibility
+     * toggle, app-info page, uninstall/force-stop dialogs and Settings search results all
+     * render the app label. Kicks are debounced because content-changed events arrive in
+     * bursts.
+     */
+    private fun handleStrictGuardEvent() {
+        val rootNode = rootInActiveWindow ?: return
+
+        val showsScrolless = rootNode.hasVisibleNodeMatching { node ->
+            node.text?.contains(appLabel) == true || node.contentDescription?.contains(appLabel) == true
+        }
+        if (showsScrolless) {
+            val nowElapsed = SystemClock.elapsedRealtime()
+            if (nowElapsed - lastStrictKickElapsed >= STRICT_KICK_DEBOUNCE_MILLIS) {
+                lastStrictKickElapsed = nowElapsed
+                Timber.i("Strict mode: guarded screen shows %s, navigating back", appLabel)
+                mainHandler.post {
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    Toast.makeText(this, R.string.strict_mode_active_toast, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // The guard path returns before normal exit detection; close a lingering
+        // brain-rot session cleanly.
+        if (isProcessingBlockedContent) {
+            validateTrackedAppState("strict guard")
+        }
     }
 
     /**
@@ -910,5 +986,15 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         const val INSTAGRAM_DM_SENDER_TIMESTAMP_VIEW_ID = "sender_timestamp"
         const val INSTAGRAM_DM_REPLY_BAR_VIEW_ID = "reply_bar_edittext"
         const val INSTAGRAM_SUGGESTED_TITLE_VIEW_ID = "suggested_title"
+
+        /** System packages whose Scrolless-related screens are closed while strict mode is armed. */
+        val STRICT_GUARD_PACKAGES = setOf(
+            "com.android.settings",
+            "com.android.settings.intelligence",
+            "com.google.android.packageinstaller",
+            "com.android.packageinstaller",
+            "com.android.vending",
+        )
+        const val STRICT_KICK_DEBOUNCE_MILLIS = 800L
     }
 }

@@ -61,6 +61,10 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _partnerQuotaAnchorWall = MutableStateFlow(0L)
     private val _partnerQuotaAnchorElapsed = MutableStateFlow(0L)
     private val _partnerQuotaAnchorBoot = MutableStateFlow(-1)
+    private val _strictUntilAt = MutableStateFlow(0L)
+    private val _strictAnchorWall = MutableStateFlow(0L)
+    private val _strictAnchorElapsed = MutableStateFlow(0L)
+    private val _strictAnchorBoot = MutableStateFlow(-1)
 
     init {
         coroutineScope.launch {
@@ -131,6 +135,18 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getPartnerQuotaAnchorBoot().collect { _partnerQuotaAnchorBoot.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getStrictUntil().collect { _strictUntilAt.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getStrictAnchorWall().collect { _strictAnchorWall.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getStrictAnchorElapsed().collect { _strictAnchorElapsed.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getStrictAnchorBoot().collect { _strictAnchorBoot.value = it }
         }
     }
 
@@ -301,5 +317,31 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     override suspend fun addPartnerQuotaGrant(deltaMillis: Long) {
         // DB is authoritative for the increment; the collector refreshes the cached flow.
         userSettingsDao.addPartnerQuotaGrant(deltaMillis)
+    }
+
+    override fun getStrictUntil(): Flow<Long> = _strictUntilAt
+
+    override fun getStrictAnchorWall(): Flow<Long> = _strictAnchorWall
+
+    override fun getStrictAnchorElapsed(): Flow<Long> = _strictAnchorElapsed
+
+    override fun getStrictAnchorBoot(): Flow<Int> = _strictAnchorBoot
+
+    override suspend fun updateStrictModeState(
+        strictUntilAt: Long,
+        anchorWallMillis: Long,
+        anchorElapsedMillis: Long,
+        anchorBootCount: Int,
+    ) {
+        _strictUntilAt.value = strictUntilAt
+        _strictAnchorWall.value = anchorWallMillis
+        _strictAnchorElapsed.value = anchorElapsedMillis
+        _strictAnchorBoot.value = anchorBootCount
+        userSettingsDao.updateStrictModeState(
+            strictUntilAt = strictUntilAt,
+            anchorWallMillis = anchorWallMillis,
+            anchorElapsedMillis = anchorElapsedMillis,
+            anchorBootCount = anchorBootCount,
+        )
     }
 }

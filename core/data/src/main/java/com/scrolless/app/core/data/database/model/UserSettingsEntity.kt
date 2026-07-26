@@ -55,4 +55,8 @@ data class UserSettingsEntity(
     @ColumnInfo(name = "partner_quota_anchor_wall", defaultValue = "0") val partnerQuotaAnchorWall: Long = 0L,
     @ColumnInfo(name = "partner_quota_anchor_elapsed", defaultValue = "0") val partnerQuotaAnchorElapsed: Long = 0L,
     @ColumnInfo(name = "partner_quota_anchor_boot", defaultValue = "-1") val partnerQuotaAnchorBoot: Int = -1,
+    @ColumnInfo(name = "strict_until_at", defaultValue = "0") val strictUntilAt: Long = 0L,
+    @ColumnInfo(name = "strict_anchor_wall", defaultValue = "0") val strictAnchorWall: Long = 0L,
+    @ColumnInfo(name = "strict_anchor_elapsed", defaultValue = "0") val strictAnchorElapsed: Long = 0L,
+    @ColumnInfo(name = "strict_anchor_boot", defaultValue = "-1") val strictAnchorBoot: Int = -1,
 )

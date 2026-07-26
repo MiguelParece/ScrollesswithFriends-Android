@@ -37,7 +37,7 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
         SessionSegmentEntity::class,
         RedeemedGiftEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -273,6 +273,15 @@ abstract class ScrollessDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
+            }
+        }
+        // Strict mode time lock: wall end time + clock anchors for tamper-proof expiry.
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_until_at INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_wall INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_elapsed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_boot INTEGER NOT NULL DEFAULT -1")
             }
         }
     }

@@ -38,6 +38,8 @@ import com.scrolless.app.core.partner.PartnerQuotaManager
 import com.scrolless.app.core.partner.PartnerQuotaManagerImpl
 import com.scrolless.app.core.repository.RedeemedGiftStore
 import com.scrolless.app.core.repository.SessionTracker
+import com.scrolless.app.core.strict.StrictModeManager
+import com.scrolless.app.core.strict.StrictModeManagerImpl
 import com.scrolless.app.core.repository.UserSettingsStore
 import dagger.Module
 import dagger.Provides
@@ -64,4 +66,9 @@ object DomainDiModule {
         redeemedGiftStore = redeemedGiftStore,
         timeProvider = timeProvider,
     )
+
+    @Provides
+    @Singleton
+    fun provideStrictModeManager(userSettingsStore: UserSettingsStore, timeProvider: TimeProvider): StrictModeManager =
+        StrictModeManagerImpl(userSettingsStore = userSettingsStore, timeProvider = timeProvider)
 }

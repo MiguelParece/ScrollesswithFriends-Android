@@ -19,6 +19,7 @@ package com.scrolless.app.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scrolless.app.core.repository.UserSettingsStore
+import com.scrolless.app.core.strict.StrictModeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,17 +29,26 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(private val userSettingsStore: UserSettingsStore) : ViewModel() {
+class SettingsViewModel @Inject constructor(
+    private val userSettingsStore: UserSettingsStore,
+    private val strictModeManager: StrictModeManager,
+) : ViewModel() {
 
+    // Note: strict-mode fields are recomputed on emissions and lifecycle restarts, not on a
+    // ticking clock — the display won't flip to "off" at the exact expiry instant.
     val uiState: StateFlow<SettingsUiState> = combine(
         userSettingsStore.getPauseDuration(),
         userSettingsStore.getExceptReelsSentByDm(),
         userSettingsStore.getTimerOverlayEnabled(),
-    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled ->
+        strictModeManager.observeState(),
+    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState ->
         SettingsUiState(
             pauseDurationMinutes = (pauseDurationMillis / 60_000L).toInt().coerceIn(1, 60),
             exceptReelsSentByDm = exceptReelsSentByDm,
             timerOverlayEnabled = timerOverlayEnabled,
+            strictModeArmed = strictModeManager.isArmed(strictState),
+            strictModeUntilMillis = strictState.untilAtMillis,
+            strictModeRemainingMillis = strictModeManager.remainingMillis(strictState),
         )
     }
         .stateIn(
@@ -64,10 +74,19 @@ class SettingsViewModel @Inject constructor(private val userSettingsStore: UserS
             userSettingsStore.setTimerOverlayToggle(checked)
         }
     }
+
+    fun onArmStrictMode(durationMillis: Long) {
+        viewModelScope.launch {
+            strictModeManager.arm(durationMillis)
+        }
+    }
 }
 
 data class SettingsUiState(
     val pauseDurationMinutes: Int = 5,
     val exceptReelsSentByDm: Boolean = false,
     val timerOverlayEnabled: Boolean = false,
+    val strictModeArmed: Boolean = false,
+    val strictModeUntilMillis: Long = 0L,
+    val strictModeRemainingMillis: Long = 0L,
 )

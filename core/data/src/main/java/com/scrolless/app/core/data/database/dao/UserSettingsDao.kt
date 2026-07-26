@@ -171,4 +171,33 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
 
     @Query("UPDATE user_settings SET partner_quota_granted_millis = partner_quota_granted_millis + :deltaMillis WHERE id = 1")
     abstract suspend fun addPartnerQuotaGrant(deltaMillis: Long)
+
+    @Query("SELECT strict_until_at FROM user_settings WHERE id = 1")
+    abstract fun getStrictUntil(): Flow<Long>
+
+    @Query("SELECT strict_anchor_wall FROM user_settings WHERE id = 1")
+    abstract fun getStrictAnchorWall(): Flow<Long>
+
+    @Query("SELECT strict_anchor_elapsed FROM user_settings WHERE id = 1")
+    abstract fun getStrictAnchorElapsed(): Flow<Long>
+
+    @Query("SELECT strict_anchor_boot FROM user_settings WHERE id = 1")
+    abstract fun getStrictAnchorBoot(): Flow<Int>
+
+    @Query(
+        """
+        UPDATE user_settings SET
+            strict_until_at = :strictUntilAt,
+            strict_anchor_wall = :anchorWallMillis,
+            strict_anchor_elapsed = :anchorElapsedMillis,
+            strict_anchor_boot = :anchorBootCount
+        WHERE id = 1
+        """,
+    )
+    abstract suspend fun updateStrictModeState(
+        strictUntilAt: Long,
+        anchorWallMillis: Long,
+        anchorElapsedMillis: Long,
+        anchorBootCount: Int,
+    )
 }

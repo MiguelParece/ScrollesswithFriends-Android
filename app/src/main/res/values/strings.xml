@@ -18,5 +18,6 @@
 <resources>
     <string name="app_name">Scrolless</string>
     <string name="accessibility_service_description">This service detects when Reels, Shorts, TikTok, and Facebook Reels are opened so that Scrolless can block them if configured.</string>
+    <string name="strict_mode_active_toast">Strict mode is on — this screen is locked until the timer ends</string>
     <string name="timer_default_value" translatable="false">00:00</string>
 </resources>
