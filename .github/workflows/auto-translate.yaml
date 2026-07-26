@@ -22,11 +22,19 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      # Skip gracefully on forks without an OpenRouter key configured
+      # (the secrets context is not available in job-level `if`).
+      - name: Check for OpenRouter API key
+        id: key
+        run: echo "present=${{ secrets.OPENROUTER_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Repository
+        if: steps.key.outputs.present == 'true'
         uses: actions/checkout@v4
 
       - name: Translate strings.xml to supported languages
         id: translate
+        if: steps.key.outputs.present == 'true'
         uses: duartebarbosadev/AndroidResourceTranslator@main
         with:
           project_context: "Scrolless is an Android app that helps users reduce time spent on social media by limiting endless scrolling of Reels, Shorts, and TikToks. Do not translate the term 'brainrot'; keep it in English in languages where the English expression is commonly understood."
@@ -35,11 +43,13 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Save translation report for PR body
+        if: steps.key.outputs.present == 'true'
         run: |
           cat <<'EOF' > "${{ runner.temp }}/translation_report.md"
           ${{ steps.translate.outputs.translation_report }}
           EOF
       - name: Create Pull Request
+        if: steps.key.outputs.present == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: auto-translate
