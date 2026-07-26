@@ -55,6 +55,17 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _firstLaunchAt = MutableStateFlow(-1L)
     private val _pauseDuration = MutableStateFlow(5 * 60 * 1000L)
     private val _exceptReelsSentByDm = MutableStateFlow(false)
+    private val _partnerQuotaWindowKey = MutableStateFlow("")
+    private val _partnerQuotaUsedMillis = MutableStateFlow(0L)
+    private val _partnerQuotaGrantedMillis = MutableStateFlow(0L)
+    private val _partnerQuotaAnchorWall = MutableStateFlow(0L)
+    private val _partnerQuotaAnchorElapsed = MutableStateFlow(0L)
+    private val _partnerQuotaAnchorBoot = MutableStateFlow(-1)
+    private val _activeChallenge = MutableStateFlow<String?>(null)
+    private val _activeChallengeCreatedWall = MutableStateFlow(0L)
+    private val _activeChallengeCreatedElapsed = MutableStateFlow(0L)
+    private val _activeChallengeBoot = MutableStateFlow(-1)
+    private val _activeChallengeAttempts = MutableStateFlow(0)
 
     init {
         coroutineScope.launch {
@@ -107,6 +118,39 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getExceptReelsSentByDm().collect { _exceptReelsSentByDm.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaWindowKey().collect { _partnerQuotaWindowKey.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaUsedMillis().collect { _partnerQuotaUsedMillis.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaGrantedMillis().collect { _partnerQuotaGrantedMillis.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaAnchorWall().collect { _partnerQuotaAnchorWall.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaAnchorElapsed().collect { _partnerQuotaAnchorElapsed.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getPartnerQuotaAnchorBoot().collect { _partnerQuotaAnchorBoot.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getActiveChallenge().collect { _activeChallenge.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getActiveChallengeCreatedWall().collect { _activeChallengeCreatedWall.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getActiveChallengeCreatedElapsed().collect { _activeChallengeCreatedElapsed.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getActiveChallengeBoot().collect { _activeChallengeBoot.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getActiveChallengeAttempts().collect { _activeChallengeAttempts.value = it }
         }
     }
 
@@ -236,5 +280,83 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     override suspend fun setReviewPromptLastAttemptAt(timestamp: Long) {
         _reviewPromptLastAttemptAt.value = timestamp
         userSettingsDao.setReviewPromptLastAttemptAt(timestamp)
+    }
+
+    override fun getPartnerQuotaWindowKey(): Flow<String> = _partnerQuotaWindowKey
+
+    override fun getPartnerQuotaUsedMillis(): Flow<Long> = _partnerQuotaUsedMillis
+
+    override fun getPartnerQuotaGrantedMillis(): Flow<Long> = _partnerQuotaGrantedMillis
+
+    override fun getPartnerQuotaAnchorWall(): Flow<Long> = _partnerQuotaAnchorWall
+
+    override fun getPartnerQuotaAnchorElapsed(): Flow<Long> = _partnerQuotaAnchorElapsed
+
+    override fun getPartnerQuotaAnchorBoot(): Flow<Int> = _partnerQuotaAnchorBoot
+
+    override suspend fun updatePartnerQuotaState(
+        windowKey: String,
+        usedMillis: Long,
+        grantedMillis: Long,
+        anchorWallMillis: Long,
+        anchorElapsedMillis: Long,
+        anchorBootCount: Int,
+    ) {
+        _partnerQuotaWindowKey.value = windowKey
+        _partnerQuotaUsedMillis.value = usedMillis
+        _partnerQuotaGrantedMillis.value = grantedMillis
+        _partnerQuotaAnchorWall.value = anchorWallMillis
+        _partnerQuotaAnchorElapsed.value = anchorElapsedMillis
+        _partnerQuotaAnchorBoot.value = anchorBootCount
+        userSettingsDao.updatePartnerQuotaState(
+            windowKey = windowKey,
+            usedMillis = usedMillis,
+            grantedMillis = grantedMillis,
+            anchorWallMillis = anchorWallMillis,
+            anchorElapsedMillis = anchorElapsedMillis,
+            anchorBootCount = anchorBootCount,
+        )
+    }
+
+    override suspend fun addPartnerQuotaGrant(deltaMillis: Long) {
+        // DB is authoritative for the increment; the collector refreshes the cached flow.
+        userSettingsDao.addPartnerQuotaGrant(deltaMillis)
+    }
+
+    override fun getActiveChallenge(): Flow<String?> = _activeChallenge
+
+    override fun getActiveChallengeCreatedWall(): Flow<Long> = _activeChallengeCreatedWall
+
+    override fun getActiveChallengeCreatedElapsed(): Flow<Long> = _activeChallengeCreatedElapsed
+
+    override fun getActiveChallengeBoot(): Flow<Int> = _activeChallengeBoot
+
+    override fun getActiveChallengeAttempts(): Flow<Int> = _activeChallengeAttempts
+
+    override suspend fun setActiveChallenge(challenge: String?, createdWallMillis: Long, createdElapsedMillis: Long, bootCount: Int) {
+        _activeChallenge.value = challenge
+        _activeChallengeCreatedWall.value = createdWallMillis
+        _activeChallengeCreatedElapsed.value = createdElapsedMillis
+        _activeChallengeBoot.value = bootCount
+        _activeChallengeAttempts.value = 0
+        userSettingsDao.setActiveChallenge(
+            challenge = challenge,
+            createdWallMillis = createdWallMillis,
+            createdElapsedMillis = createdElapsedMillis,
+            bootCount = bootCount,
+        )
+    }
+
+    override suspend fun incrementChallengeAttempts() {
+        userSettingsDao.incrementChallengeAttempts()
+    }
+
+    override suspend fun clearActiveChallenge() {
+        _activeChallenge.value = null
+        _activeChallengeCreatedWall.value = 0L
+        _activeChallengeCreatedElapsed.value = 0L
+        _activeChallengeBoot.value = -1
+        _activeChallengeAttempts.value = 0
+        userSettingsDao.clearActiveChallenge()
     }
 }

@@ -14,34 +14,31 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.blocking.time
+package com.scrolless.app.core.data.repository
 
+import android.content.Context
+import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
+import com.scrolless.app.core.blocking.time.TimeProvider
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-interface TimeProvider {
-    fun currentTimeInMillis(): Long
-    fun localDateNow(): LocalDate
-    fun localDateTimeNow(): LocalDateTime
-
-    /**
-     * Monotonic milliseconds since boot, including deep sleep. Unlike the wall clock,
-     * this cannot be changed from device settings.
-     */
-    fun elapsedRealtimeMillis(): Long
-
-    /**
-     * Number of boots since factory reset ([android.provider.Settings.Global.BOOT_COUNT]),
-     * or -1 when unavailable (API 23 or lookup failure).
-     */
-    fun bootCount(): Int
-}
-
-object SystemTimeProvider : TimeProvider {
+/**
+ * [TimeProvider] backed by the platform clocks, with boot-count support where the API allows.
+ */
+class AndroidTimeProvider(private val context: Context) : TimeProvider {
     override fun currentTimeInMillis(): Long = System.currentTimeMillis()
     override fun localDateNow(): LocalDate = LocalDate.now()
     override fun localDateTimeNow(): LocalDateTime = LocalDateTime.now()
     override fun elapsedRealtimeMillis(): Long = SystemClock.elapsedRealtime()
-    override fun bootCount(): Int = -1
+
+    override fun bootCount(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return -1
+        return try {
+            Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT)
+        } catch (e: Settings.SettingNotFoundException) {
+            -1
+        }
+    }
 }

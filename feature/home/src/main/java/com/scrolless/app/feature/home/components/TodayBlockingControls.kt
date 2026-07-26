@@ -84,7 +84,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.model.BlockOption
+import com.scrolless.app.core.model.QuotaWindow
 import com.scrolless.app.designsystem.component.AutoResizingText
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.designsystem.tooling.DevicePreviews
@@ -93,10 +95,11 @@ import com.scrolless.app.designsystem.util.toCountdownLabel
 import com.scrolless.app.designsystem.util.toIntervalLabel
 import com.scrolless.app.feature.home.HomeUiState
 import com.scrolless.app.feature.home.R
+import java.time.LocalDateTime
 import kotlinx.coroutines.delay
 import timber.log.Timber
 
-enum class BlockingButtonType { BLOCK_ALL, DAILY_LIMIT, INTERVAL }
+enum class BlockingButtonType { BLOCK_ALL, DAILY_LIMIT, INTERVAL, PARTNER_QUOTA }
 
 @Composable
 fun TodayBlockingControls(
@@ -108,6 +111,7 @@ fun TodayBlockingControls(
     onConfigureDailyLimit: () -> Unit,
     onIntervalTimerClick: () -> Unit,
     onIntervalTimerEdit: () -> Unit,
+    onPartnerQuotaAskMore: () -> Unit,
     onPauseToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -132,16 +136,19 @@ fun TodayBlockingControls(
     val blockAllInteractionSource = remember { MutableInteractionSource() }
     val dailyLimitInteractionSource = remember { MutableInteractionSource() }
     val intervalInteractionSource = remember { MutableInteractionSource() }
+    val partnerQuotaInteractionSource = remember { MutableInteractionSource() }
 
     val isBlockAllPressed by blockAllInteractionSource.collectIsPressedAsState()
     val isDailyLimitPressed by dailyLimitInteractionSource.collectIsPressedAsState()
     val isIntervalPressed by intervalInteractionSource.collectIsPressedAsState()
+    val isPartnerQuotaPressed by partnerQuotaInteractionSource.collectIsPressedAsState()
 
     // Helper to evaluate target weight based on click/press states
     fun isPressedOrClicked(button: BlockingButtonType): Boolean = when (button) {
         BlockingButtonType.BLOCK_ALL -> isBlockAllPressed || lastClicked == BlockingButtonType.BLOCK_ALL
         BlockingButtonType.DAILY_LIMIT -> isDailyLimitPressed || lastClicked == BlockingButtonType.DAILY_LIMIT
         BlockingButtonType.INTERVAL -> isIntervalPressed || lastClicked == BlockingButtonType.INTERVAL
+        BlockingButtonType.PARTNER_QUOTA -> isPartnerQuotaPressed || lastClicked == BlockingButtonType.PARTNER_QUOTA
     }
 
     fun weightFor(button: BlockingButtonType): Float = when {
@@ -164,6 +171,11 @@ fun TodayBlockingControls(
     val intervalWeight by animateFloatAsState(
         targetValue = weightFor(BlockingButtonType.INTERVAL),
         animationSpec = pressAnimationSpec, label = "intervalWeight",
+    )
+
+    val partnerQuotaWeight by animateFloatAsState(
+        targetValue = weightFor(BlockingButtonType.PARTNER_QUOTA),
+        animationSpec = pressAnimationSpec, label = "partnerQuotaWeight",
     )
 
     Column(
@@ -210,12 +222,26 @@ fun TodayBlockingControls(
                 Timber.i("IntervalTimer clicked from feature row")
                 onIntervalTimerClick()
             },
+            onPartnerQuotaClick = {
+                lastClicked = BlockingButtonType.PARTNER_QUOTA
+                val isSelected = uiState.blockOption == BlockOption.PartnerQuota
+                hapticFeedback.playToggle(!isSelected)
+                val newOption = if (isSelected) {
+                    BlockOption.NothingSelected
+                } else {
+                    BlockOption.PartnerQuota
+                }
+                Timber.i("PartnerQuota clicked -> newOption=%s (prev=%s)", newOption, uiState.blockOption)
+                onBlockOptionSelected(newOption)
+            },
             blockAllInteractionSource = blockAllInteractionSource,
             dailyLimitInteractionSource = dailyLimitInteractionSource,
             intervalInteractionSource = intervalInteractionSource,
+            partnerQuotaInteractionSource = partnerQuotaInteractionSource,
             blockAllAnimatedWeight = blockAllWeight,
             dailyLimitAnimatedWeight = dailyLimitWeight,
             intervalAnimatedWeight = intervalWeight,
+            partnerQuotaAnimatedWeight = partnerQuotaWeight,
         )
 
         AnimatedVisibility(
@@ -271,6 +297,33 @@ fun TodayBlockingControls(
         }
 
         if (uiState.blockOption == BlockOption.IntervalTimer) {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        if (uiState.blockOption == BlockOption.PartnerQuota) {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        AnimatedVisibility(
+            visible = uiState.blockOption == BlockOption.PartnerQuota,
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = tween(300),
+            ) + fadeIn(animationSpec = tween(200)),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = tween(300),
+            ) + fadeOut(animationSpec = tween(200)),
+        ) {
+            PartnerQuotaSettingsCard(
+                usedMillis = uiState.partnerQuotaUsedMillis,
+                grantedMillis = uiState.partnerQuotaGrantedMillis,
+                onAskMoreClick = onPartnerQuotaAskMore,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        if (uiState.blockOption == BlockOption.PartnerQuota) {
             Spacer(modifier = Modifier.height(24.dp))
         }
 
@@ -426,6 +479,73 @@ fun IntervalTimerSettingsCard(intervalLengthMillis: Long, allowanceMillis: Long,
 }
 
 @Composable
+fun PartnerQuotaSettingsCard(usedMillis: Long, grantedMillis: Long, onAskMoreClick: () -> Unit, modifier: Modifier = Modifier) {
+    val limitMillis = PartnerQuotaBlockHandler.DEFAULT_BASELINE_MILLIS + grantedMillis
+    val windowLabel = when (PartnerQuotaBlockHandler.windowFor(LocalDateTime.now())) {
+        QuotaWindow.MORNING -> stringResource(R.string.partner_quota_window_morning)
+        QuotaWindow.AFTERNOON -> stringResource(R.string.partner_quota_window_afternoon)
+        QuotaWindow.NIGHT -> stringResource(R.string.partner_quota_window_night)
+    }
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.40f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.partner_quota_card_summary),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+
+            Text(
+                text = windowLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IntervalValueChip(
+                    label = stringResource(R.string.partner_quota_card_used_chip),
+                    value = usedMillis.toIntervalLabel(),
+                    modifier = Modifier.weight(1f),
+                )
+                IntervalValueChip(
+                    label = stringResource(R.string.partner_quota_card_granted_chip),
+                    value = limitMillis.toIntervalLabel(),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Button(
+                onClick = onAskMoreClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Text(text = stringResource(R.string.partner_quota_card_ask_more))
+            }
+        }
+    }
+}
+
+@Composable
 private fun IntervalValueChip(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
@@ -557,12 +677,15 @@ fun FeatureButtonsRow(
     onBlockAllClick: () -> Unit,
     onDailyLimitClick: () -> Unit,
     onIntervalTimerClick: () -> Unit,
+    onPartnerQuotaClick: () -> Unit,
     blockAllInteractionSource: MutableInteractionSource,
     dailyLimitInteractionSource: MutableInteractionSource,
     intervalInteractionSource: MutableInteractionSource,
+    partnerQuotaInteractionSource: MutableInteractionSource,
     blockAllAnimatedWeight: Float,
     dailyLimitAnimatedWeight: Float,
     intervalAnimatedWeight: Float,
+    partnerQuotaAnimatedWeight: Float,
     modifier: Modifier = Modifier,
 ) {
     ButtonGroup(
@@ -627,6 +750,21 @@ fun FeatureButtonsRow(
                         )
                     }
                 }
+            },
+            menuContent = {},
+        )
+
+        customItem(
+            buttonGroupContent = {
+                FeatureButton(
+                    onClick = onPartnerQuotaClick,
+                    icon = R.drawable.ic_partner_quota,
+                    text = stringResource(id = R.string.partner_quota),
+                    contentDescription = stringResource(id = R.string.partner_quota),
+                    isSelected = selectedOption == BlockOption.PartnerQuota,
+                    interactionSource = partnerQuotaInteractionSource,
+                    modifier = Modifier.weight(partnerQuotaAnimatedWeight),
+                )
             },
             menuContent = {},
         )
@@ -757,6 +895,7 @@ fun TodayBlockingControlsPreview() {
                 onConfigureDailyLimit = {},
                 onIntervalTimerClick = {},
                 onIntervalTimerEdit = {},
+                onPartnerQuotaAskMore = {},
                 onPauseToggle = { _ -> },
             )
         }
@@ -777,6 +916,7 @@ fun TodayBlockingIntervalTimerControlsPreview() {
                 onConfigureDailyLimit = {},
                 onIntervalTimerClick = {},
                 onIntervalTimerEdit = {},
+                onPartnerQuotaAskMore = {},
                 onPauseToggle = { _ -> },
             )
         }

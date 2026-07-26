@@ -101,6 +101,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockableApp
 import com.scrolless.app.core.model.SessionSegment
@@ -125,6 +126,7 @@ import com.scrolless.app.feature.home.dialogs.AccessibilitySuccessBottomSheet
 import com.scrolless.app.feature.home.dialogs.AccessibilitySuccessBottomSheetPreview
 import com.scrolless.app.feature.home.dialogs.HelpDialog
 import com.scrolless.app.feature.home.dialogs.IntervalTimerDialog
+import com.scrolless.app.feature.home.dialogs.PartnerQuotaRequestSheet
 import com.scrolless.app.feature.home.dialogs.TimeLimitDialog
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -160,6 +162,7 @@ fun HomeScreen(
     var showAccessibilitySuccess by remember { mutableStateOf(false) }
     var debugBypassAccessibilityCheck by remember { mutableStateOf(false) }
     var showIntervalTimerDialog by remember { mutableStateOf(false) }
+    var showPartnerQuotaRequestSheet by remember { mutableStateOf(false) }
     var pendingIntervalBreak by remember { mutableLongStateOf(DEFAULT_INTERVAL_BREAK_MILLIS) }
     var pendingIntervalAllowance by remember { mutableLongStateOf(DEFAULT_INTERVAL_ALLOWANCE_MILLIS) }
     val pauseRemainingMillis = rememberPauseRemainingTime(uiState.pauseUntilMillis)
@@ -348,6 +351,10 @@ fun HomeScreen(
                     showAccessibilityExplainerPrompt()
                 }
             },
+            onPartnerQuotaAskMore = {
+                Timber.d("Partner quota: ask-for-more requested")
+                showPartnerQuotaRequestSheet = true
+            },
             onPauseToggle = { shouldPause ->
 
                 val shouldBypass = BuildConfig.DEBUG && debugBypassAccessibilityCheck
@@ -426,6 +433,16 @@ fun HomeScreen(
         )
     }
 
+    if (showPartnerQuotaRequestSheet) {
+        PartnerQuotaRequestSheet(
+            onDismiss = { showPartnerQuotaRequestSheet = false },
+            onOpenSettings = {
+                showPartnerQuotaRequestSheet = false
+                onNavigateToSettings()
+            },
+        )
+    }
+
     if (showAccessibilityExplainer) {
         AccessibilityExplainerBottomSheet(
             onDismiss = {
@@ -466,6 +483,7 @@ private fun HomeContent(
     onHelpClicked: () -> Unit,
     onIntervalTimerClick: () -> Unit,
     onIntervalTimerEdit: () -> Unit,
+    onPartnerQuotaAskMore: () -> Unit = {},
     onPauseToggle: (Boolean) -> Unit,
     onDebugUsageChanged: (List<SessionSegment>) -> Unit = {},
     onDebugUsageReset: () -> Unit = {},
@@ -505,6 +523,10 @@ private fun HomeContent(
         BlockOption.DailyLimit -> uiState.timeLimit > 0 && uiState.currentUsage >= uiState.timeLimit
 
         BlockOption.IntervalTimer -> uiState.timeLimit > 0 && uiState.intervalUsage >= uiState.timeLimit
+
+        BlockOption.PartnerQuota ->
+            uiState.partnerQuotaUsedMillis >=
+                PartnerQuotaBlockHandler.DEFAULT_BASELINE_MILLIS + uiState.partnerQuotaGrantedMillis
 
         BlockOption.NothingSelected -> false
     }
@@ -582,6 +604,7 @@ private fun HomeContent(
                         onConfigureDailyLimit = onConfigureDailyLimit,
                         onIntervalTimerClick = onIntervalTimerClick,
                         onIntervalTimerEdit = onIntervalTimerEdit,
+                        onPartnerQuotaAskMore = onPartnerQuotaAskMore,
                         onPauseToggle = onPauseToggle,
                     )
                 }

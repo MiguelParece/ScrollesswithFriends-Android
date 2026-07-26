@@ -22,9 +22,11 @@ import com.scrolless.app.core.blocking.handler.DayLimitBlockHandler
 import com.scrolless.app.core.blocking.handler.IntervalTimerBlockHandler
 import com.scrolless.app.core.blocking.handler.IntervalTimerState
 import com.scrolless.app.core.blocking.handler.NoBlockHandler
+import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.blocking.time.TimeProvider
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockingResult
+import com.scrolless.app.core.model.PartnerQuotaState
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
 import javax.inject.Inject
@@ -65,6 +67,14 @@ class BlockingManagerImpl @Inject constructor(
             windowStartMillis = userSettingsStore.getIntervalWindowStart().first(),
             usageMillis = userSettingsStore.getIntervalUsage().first(),
         )
+        val partnerQuotaState = PartnerQuotaState(
+            windowKey = userSettingsStore.getPartnerQuotaWindowKey().first(),
+            usedMillis = userSettingsStore.getPartnerQuotaUsedMillis().first(),
+            grantedMillis = userSettingsStore.getPartnerQuotaGrantedMillis().first(),
+            anchorWallMillis = userSettingsStore.getPartnerQuotaAnchorWall().first(),
+            anchorElapsedMillis = userSettingsStore.getPartnerQuotaAnchorElapsed().first(),
+            anchorBootCount = userSettingsStore.getPartnerQuotaAnchorBoot().first(),
+        )
 
         Timber.i(
             "init: option=%s, timeLimit=%d, intervalLength=%d, intervalState=%s",
@@ -73,7 +83,7 @@ class BlockingManagerImpl @Inject constructor(
             intervalLength,
             intervalState,
         )
-        handler = createHandlerForConfig(blockOption, timeLimit, intervalLength, intervalState)
+        handler = createHandlerForConfig(blockOption, timeLimit, intervalLength, intervalState, partnerQuotaState)
     }
 
     /**
@@ -89,6 +99,7 @@ class BlockingManagerImpl @Inject constructor(
         timeLimit: Long,
         intervalLength: Long,
         intervalState: IntervalTimerState,
+        partnerQuotaState: PartnerQuotaState,
     ): BlockOptionHandler = when (blockOption) {
         BlockOption.BlockAll -> BlockAllBlockHandler(timeProvider).also { Timber.d("Using BlockAll handler") }
 
@@ -104,7 +115,26 @@ class BlockingManagerImpl @Inject constructor(
                         userSettingsStore.updateIntervalState(state.windowStartMillis, state.usageMillis)
                     }
                 },
+                currentTimeProvider = timeProvider::currentTimeInMillis,
             ).also { Timber.d("Using IntervalTimer handler (limit=%d, interval=%d)", timeLimit, intervalLength) }
+
+        BlockOption.PartnerQuota ->
+            PartnerQuotaBlockHandler(
+                initialState = partnerQuotaState,
+                onStateChanged = { state ->
+                    persistenceScope.launch {
+                        userSettingsStore.updatePartnerQuotaState(
+                            windowKey = state.windowKey,
+                            usedMillis = state.usedMillis,
+                            grantedMillis = state.grantedMillis,
+                            anchorWallMillis = state.anchorWallMillis,
+                            anchorElapsedMillis = state.anchorElapsedMillis,
+                            anchorBootCount = state.anchorBootCount,
+                        )
+                    }
+                },
+                timeProvider = timeProvider,
+            ).also { Timber.d("Using PartnerQuota handler (state=%s)", partnerQuotaState) }
 
         BlockOption.NothingSelected -> NoBlockHandler().also { Timber.d("Using NothingSelected handler") }
     }

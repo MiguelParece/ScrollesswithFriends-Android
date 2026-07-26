@@ -21,8 +21,10 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.scrolless.app.core.data.database.dao.PartnerLinkDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
+import com.scrolless.app.core.data.database.model.PartnerLinkEntity
 import com.scrolless.app.core.data.database.model.SessionSegmentEntity
 import com.scrolless.app.core.data.database.model.UserSettingsEntity
 
@@ -33,8 +35,9 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
     entities = [
         UserSettingsEntity::class,
         SessionSegmentEntity::class,
+        PartnerLinkEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -42,6 +45,8 @@ abstract class ScrollessDatabase : RoomDatabase() {
     abstract fun userSettingsDao(): UserSettingsDao
 
     abstract fun sessionSegmentDao(): SessionSegmentDao
+
+    abstract fun partnerLinkDao(): PartnerLinkDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -247,6 +252,37 @@ abstract class ScrollessDatabase : RoomDatabase() {
                     SET first_launch_at = CAST(strftime('%s','now') AS INTEGER) * 1000
                     WHERE first_launch_at = 0
                     """.trimIndent(),
+                )
+            }
+        }
+        // Partner Quota block option: per-window quota counters + clock anchors + active
+        // grant challenge on user_settings, and the partner_links pairing table.
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_window_key TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_used_millis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_granted_millis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_anchor_wall INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_anchor_elapsed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN partner_quota_anchor_boot INTEGER NOT NULL DEFAULT -1")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN active_challenge TEXT")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN active_challenge_created_wall INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN active_challenge_created_elapsed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN active_challenge_boot INTEGER NOT NULL DEFAULT -1")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN active_challenge_attempts INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS partner_links (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        keystore_alias TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        created_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_partner_links_keystore_alias ON partner_links (keystore_alias)",
                 )
             }
         }

@@ -63,5 +63,9 @@ class SessionSegmentStoreImplTest : BaseTest() {
         override fun localDateNow(): LocalDate = currentDate
 
         override fun localDateTimeNow(): LocalDateTime = currentDate.atStartOfDay()
+
+        override fun elapsedRealtimeMillis(): Long = 0L
+
+        override fun bootCount(): Int = -1
     }
 }

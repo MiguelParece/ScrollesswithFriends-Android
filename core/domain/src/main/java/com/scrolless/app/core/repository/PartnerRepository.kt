@@ -14,12 +14,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.model
+package com.scrolless.app.core.repository
 
-enum class BlockOption {
-    BlockAll,
-    DailyLimit,
-    IntervalTimer,
-    PartnerQuota,
-    NothingSelected,
+import com.scrolless.app.core.model.PartnerLink
+import com.scrolless.app.core.model.PartnerRole
+import kotlinx.coroutines.flow.Flow
+
+interface PartnerRepository {
+
+    fun getByRole(role: PartnerRole): Flow<List<PartnerLink>>
+
+    suspend fun add(name: String, keystoreAlias: String, role: PartnerRole)
+
+    suspend fun delete(link: PartnerLink)
 }

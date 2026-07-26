@@ -129,4 +129,90 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
 
     @Query("UPDATE user_settings SET except_reels_sent_by_dm = :checked WHERE id = 1")
     abstract suspend fun setExceptReelsSentByDm(checked: Boolean)
+
+    @Query("SELECT partner_quota_window_key FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaWindowKey(): Flow<String>
+
+    @Query("SELECT partner_quota_used_millis FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaUsedMillis(): Flow<Long>
+
+    @Query("SELECT partner_quota_granted_millis FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaGrantedMillis(): Flow<Long>
+
+    @Query("SELECT partner_quota_anchor_wall FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaAnchorWall(): Flow<Long>
+
+    @Query("SELECT partner_quota_anchor_elapsed FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaAnchorElapsed(): Flow<Long>
+
+    @Query("SELECT partner_quota_anchor_boot FROM user_settings WHERE id = 1")
+    abstract fun getPartnerQuotaAnchorBoot(): Flow<Int>
+
+    @Query(
+        """
+        UPDATE user_settings SET
+            partner_quota_window_key = :windowKey,
+            partner_quota_used_millis = :usedMillis,
+            partner_quota_granted_millis = :grantedMillis,
+            partner_quota_anchor_wall = :anchorWallMillis,
+            partner_quota_anchor_elapsed = :anchorElapsedMillis,
+            partner_quota_anchor_boot = :anchorBootCount
+        WHERE id = 1
+        """,
+    )
+    abstract suspend fun updatePartnerQuotaState(
+        windowKey: String,
+        usedMillis: Long,
+        grantedMillis: Long,
+        anchorWallMillis: Long,
+        anchorElapsedMillis: Long,
+        anchorBootCount: Int,
+    )
+
+    @Query("UPDATE user_settings SET partner_quota_granted_millis = partner_quota_granted_millis + :deltaMillis WHERE id = 1")
+    abstract suspend fun addPartnerQuotaGrant(deltaMillis: Long)
+
+    @Query("SELECT active_challenge FROM user_settings WHERE id = 1")
+    abstract fun getActiveChallenge(): Flow<String?>
+
+    @Query("SELECT active_challenge_created_wall FROM user_settings WHERE id = 1")
+    abstract fun getActiveChallengeCreatedWall(): Flow<Long>
+
+    @Query("SELECT active_challenge_created_elapsed FROM user_settings WHERE id = 1")
+    abstract fun getActiveChallengeCreatedElapsed(): Flow<Long>
+
+    @Query("SELECT active_challenge_boot FROM user_settings WHERE id = 1")
+    abstract fun getActiveChallengeBoot(): Flow<Int>
+
+    @Query("SELECT active_challenge_attempts FROM user_settings WHERE id = 1")
+    abstract fun getActiveChallengeAttempts(): Flow<Int>
+
+    @Query(
+        """
+        UPDATE user_settings SET
+            active_challenge = :challenge,
+            active_challenge_created_wall = :createdWallMillis,
+            active_challenge_created_elapsed = :createdElapsedMillis,
+            active_challenge_boot = :bootCount,
+            active_challenge_attempts = 0
+        WHERE id = 1
+        """,
+    )
+    abstract suspend fun setActiveChallenge(challenge: String?, createdWallMillis: Long, createdElapsedMillis: Long, bootCount: Int)
+
+    @Query("UPDATE user_settings SET active_challenge_attempts = active_challenge_attempts + 1 WHERE id = 1")
+    abstract suspend fun incrementChallengeAttempts()
+
+    @Query(
+        """
+        UPDATE user_settings SET
+            active_challenge = NULL,
+            active_challenge_created_wall = 0,
+            active_challenge_created_elapsed = 0,
+            active_challenge_boot = -1,
+            active_challenge_attempts = 0
+        WHERE id = 1
+        """,
+    )
+    abstract suspend fun clearActiveChallenge()
 }

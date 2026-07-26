@@ -29,6 +29,8 @@ import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.feature.home.HomeScreen
 import com.scrolless.app.feature.settings.SettingsScreen
+import com.scrolless.app.feature.settings.partner.PartnerManagementScreen
+import com.scrolless.app.feature.settings.partner.PartnerModeScreen
 import com.scrolless.app.util.requestAppReview
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -58,6 +60,18 @@ class MainActivity : ComponentActivity() {
                                 }
                                 entry<ScrollessRoute.Settings> {
                                     SettingsScreen(
+                                        onNavigateBack = appState::navigateBack,
+                                        onNavigateToPartners = appState::navigateToPartnerManagement,
+                                        onNavigateToPartnerMode = appState::navigateToPartnerMode,
+                                    )
+                                }
+                                entry<ScrollessRoute.PartnerManagement> {
+                                    PartnerManagementScreen(
+                                        onNavigateBack = appState::navigateBack,
+                                    )
+                                }
+                                entry<ScrollessRoute.PartnerMode> {
+                                    PartnerModeScreen(
                                         onNavigateBack = appState::navigateBack,
                                     )
                                 }

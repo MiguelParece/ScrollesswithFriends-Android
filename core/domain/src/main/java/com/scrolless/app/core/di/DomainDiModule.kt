@@ -34,6 +34,10 @@ package com.scrolless.app.core.di
 import com.scrolless.app.core.blocking.BlockingManager
 import com.scrolless.app.core.blocking.BlockingManagerImpl
 import com.scrolless.app.core.blocking.time.TimeProvider
+import com.scrolless.app.core.partner.GrantCodeSigner
+import com.scrolless.app.core.partner.PartnerQuotaManager
+import com.scrolless.app.core.partner.PartnerQuotaManagerImpl
+import com.scrolless.app.core.repository.PartnerRepository
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
 import dagger.Module
@@ -49,4 +53,18 @@ object DomainDiModule {
     @Singleton
     fun provideBlockingManager(timeProvider: TimeProvider, sessionTracker: SessionTracker, userSettingsStore: UserSettingsStore): BlockingManager =
         BlockingManagerImpl(sessionTracker, userSettingsStore, timeProvider = timeProvider)
+
+    @Provides
+    @Singleton
+    fun providePartnerQuotaManager(
+        partnerRepository: PartnerRepository,
+        grantCodeSigner: GrantCodeSigner,
+        userSettingsStore: UserSettingsStore,
+        timeProvider: TimeProvider,
+    ): PartnerQuotaManager = PartnerQuotaManagerImpl(
+        partnerRepository = partnerRepository,
+        grantCodeSigner = grantCodeSigner,
+        userSettingsStore = userSettingsStore,
+        timeProvider = timeProvider,
+    )
 }

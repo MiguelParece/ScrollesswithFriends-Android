@@ -103,6 +103,52 @@
 
     <string name="interval_timer_card_summary_empty">Set your first schedule to start alternating breaks.</string>
 
+    <string name="partner_quota">Partner\nQuota</string>
+
+    <string name="partner_quota_card_summary">15 min per window — extra time only with a partner’s code</string>
+
+    <string name="partner_quota_card_used_chip">Used this window</string>
+
+    <string name="partner_quota_card_granted_chip">Allowance</string>
+
+    <string name="partner_quota_card_ask_more">Ask for more time</string>
+
+    <string name="partner_quota_window_morning">Morning window (05:00–12:00)</string>
+
+    <string name="partner_quota_window_afternoon">Afternoon window (12:00–18:00)</string>
+
+    <string name="partner_quota_window_night">Night window (18:00–05:00)</string>
+
+    <string name="partner_quota_sheet_title">Ask for more time</string>
+
+    <string name="partner_quota_sheet_instructions">Send this request code to your partner. They reply with an 8-digit code that unlocks +15 minutes for this window.</string>
+
+    <string name="partner_quota_sheet_challenge_loading">…</string>
+
+    <string name="partner_quota_sheet_share">Share request</string>
+
+    <string name="partner_quota_sheet_share_text">Can I get 15 more minutes? My Scrolless request code is %1$s</string>
+
+    <string name="partner_quota_sheet_new_challenge">New code</string>
+
+    <string name="partner_quota_sheet_code_label">Partner’s 8-digit code</string>
+
+    <string name="partner_quota_sheet_verify">Verify code</string>
+
+    <string name="partner_quota_sheet_invalid_code">Wrong code. %1$d attempts left for this request.</string>
+
+    <string name="partner_quota_sheet_challenge_expired">Request expired. Create a new code and ask again.</string>
+
+    <string name="partner_quota_sheet_too_many_attempts">Too many wrong codes. Create a new request.</string>
+
+    <string name="partner_quota_sheet_granted">%1$s granted you 15 extra minutes 🎉</string>
+
+    <string name="partner_quota_sheet_done">Done</string>
+
+    <string name="partner_quota_sheet_no_partners">No accountability partner paired yet. Pair one in Settings first — they’ll be the only person able to grant you extra time.</string>
+
+    <string name="partner_quota_sheet_open_settings">Open Settings</string>
+
     <string name="interval_timer_dialog_allowance_description">How long you can watch shorts once a break starts.</string>
 
     <string name="interval_timer_dialog_allowance_label">Allowed watch time</string>

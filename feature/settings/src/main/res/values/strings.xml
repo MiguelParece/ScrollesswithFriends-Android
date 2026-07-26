@@ -30,6 +30,80 @@
     <string name="settings_pause_duration_title">Pause Duration</string>
 
     <string name="settings_section_blocking">Blocking</string>
+
+    <string name="cancel">Cancel</string>
+
+    <string name="close">Close</string>
+
+    <string name="settings_section_partner_quota">Partner Quota</string>
+
+    <string name="settings_partner_management_title">My partners</string>
+
+    <string name="settings_partner_management_description">People who can grant you extra watch time</string>
+
+    <string name="settings_partner_mode_title">Partner mode</string>
+
+    <string name="settings_partner_mode_description">Grant extra time to someone you supervise</string>
+
+    <string name="partner_management_title">My partners</string>
+
+    <string name="partner_management_description">Partners are the only people who can unlock extra watch time on this device. Pair in person: your partner opens Partner mode on their Scrolless and shows you the pairing code.</string>
+
+    <string name="partner_management_empty">No partner paired yet.</string>
+
+    <string name="partner_management_add">Add partner</string>
+
+    <string name="partner_management_add_title">Pair a partner</string>
+
+    <string name="partner_management_add_instructions">Hand your phone to your partner and let them type the pairing code their Scrolless shows. The code is shown only once and never again.</string>
+
+    <string name="partner_management_name_label">Name</string>
+
+    <string name="partner_management_secret_label">Pairing code</string>
+
+    <string name="partner_management_secret_invalid">That pairing code is not valid. Check for typos and try again.</string>
+
+    <string name="partner_management_pair">Pair</string>
+
+    <string name="partner_management_remove">Remove</string>
+
+    <string name="partner_management_revoke_title">Remove %1$s?</string>
+
+    <string name="partner_management_revoke_text">They will no longer be able to grant you extra time. Pairing again requires meeting in person.</string>
+
+    <string name="partner_mode_title">Partner mode</string>
+
+    <string name="partner_mode_description">You hold the keys for people you supervise. When they send you a request code, generate the matching grant code here — only your device can produce it.</string>
+
+    <string name="partner_mode_empty">You are not a partner for anyone yet.</string>
+
+    <string name="partner_mode_add_person">Add person</string>
+
+    <string name="partner_mode_add_title">Create pairing</string>
+
+    <string name="partner_mode_add_instructions">Enter the name of the person you will grant time to. You will get a one-time pairing code they must type into their Scrolless.</string>
+
+    <string name="partner_mode_create">Create</string>
+
+    <string name="partner_mode_secret_title">One-time pairing code</string>
+
+    <string name="partner_mode_secret_instructions">Let them type this code into Scrolless → Settings → My partners. Do it now — it will not be shown again.</string>
+
+    <string name="partner_mode_secret_warning">Never send this code over chat. Anyone who has it can grant themselves time.</string>
+
+    <string name="partner_mode_secret_done">I typed it, done</string>
+
+    <string name="partner_mode_generate_code">Grant code</string>
+
+    <string name="partner_mode_code_title">Grant code for %1$s</string>
+
+    <string name="partner_mode_code_instructions">Type the 6-character request code they sent you. Granting gives them +15 minutes.</string>
+
+    <string name="partner_mode_challenge_label">Request code</string>
+
+    <string name="partner_mode_code_hint">Send this code back to them. It works once and expires in 10 minutes.</string>
+
+    <string name="partner_mode_revoke_text">You will no longer be able to grant this person time.</string>
     <string name="settings_show_onscreen_timer_description">Keep a floating timer visible while watching short-form content.</string>
     <string name="settings_show_onscreen_timer_title">Show on-screen timer</string>
     <plurals name="settings_pause_duration_value">

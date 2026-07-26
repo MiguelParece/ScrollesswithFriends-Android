@@ -19,6 +19,7 @@ package com.scrolless.app.feature.home
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.SessionSegment
 import com.scrolless.app.core.model.usage.DailyUsageTotal
@@ -157,7 +158,19 @@ class HomeViewModel @Inject constructor(
         userSettingsStore.getIntervalWindowStart(),
         currentDate.flatMapLatest { date -> sessionSegmentStore.observeTotalDuration(date) },
         sessionSegmentsForCurrentDay,
-    ) { blockOption, timeLimit, intervalLength, intervalUsage, intervalWindowStart, currentUsage, usageSegment ->
+        userSettingsStore.getPartnerQuotaUsedMillis(),
+        userSettingsStore.getPartnerQuotaGrantedMillis(),
+    ) {
+            blockOption,
+            timeLimit,
+            intervalLength,
+            intervalUsage,
+            intervalWindowStart,
+            currentUsage,
+            usageSegment,
+            partnerQuotaUsed,
+            partnerQuotaGranted,
+        ->
         UsageSnapshot(
             blockOption = blockOption,
             timeLimit = timeLimit,
@@ -166,6 +179,8 @@ class HomeViewModel @Inject constructor(
             intervalWindowStart = intervalWindowStart,
             currentUsage = currentUsage,
             sessionSegment = usageSegment,
+            partnerQuotaUsedMillis = partnerQuotaUsed,
+            partnerQuotaGrantedMillis = partnerQuotaGranted,
         )
     }
 
@@ -194,6 +209,8 @@ class HomeViewModel @Inject constructor(
             currentUsage = usage.currentUsage,
             timeLimit = usage.timeLimit,
             intervalUsage = usage.intervalUsage,
+            partnerQuotaUsed = usage.partnerQuotaUsedMillis,
+            partnerQuotaLimit = PartnerQuotaBlockHandler.DEFAULT_BASELINE_MILLIS + usage.partnerQuotaGrantedMillis,
         )
 
         HomeUiState(
@@ -203,6 +220,8 @@ class HomeViewModel @Inject constructor(
             intervalUsage = usage.intervalUsage,
             intervalWindowStart = usage.intervalWindowStart,
             currentUsage = usage.currentUsage,
+            partnerQuotaUsedMillis = usage.partnerQuotaUsedMillis,
+            partnerQuotaGrantedMillis = usage.partnerQuotaGrantedMillis,
             progress = progress,
             pauseUntilMillis = pauseUntil,
             pauseDurationMillis = pauseDuration,
@@ -281,12 +300,19 @@ class HomeViewModel @Inject constructor(
      * @param intervalUsage Usage accumulated in the current interval window.
      * @return Progress in integer percent, clamped to the [0, 100] range.
      */
-    private fun calculateProgress(blockOption: BlockOption, currentUsage: Long, timeLimit: Long, intervalUsage: Long): Int =
-        when (blockOption) {
-            BlockOption.DailyLimit -> usageToProgress(usage = currentUsage, limit = timeLimit)
-            BlockOption.IntervalTimer -> usageToProgress(usage = intervalUsage, limit = timeLimit)
-            else -> 0
-        }
+    private fun calculateProgress(
+        blockOption: BlockOption,
+        currentUsage: Long,
+        timeLimit: Long,
+        intervalUsage: Long,
+        partnerQuotaUsed: Long,
+        partnerQuotaLimit: Long,
+    ): Int = when (blockOption) {
+        BlockOption.DailyLimit -> usageToProgress(usage = currentUsage, limit = timeLimit)
+        BlockOption.IntervalTimer -> usageToProgress(usage = intervalUsage, limit = timeLimit)
+        BlockOption.PartnerQuota -> usageToProgress(usage = partnerQuotaUsed, limit = partnerQuotaLimit)
+        else -> 0
+    }
 
     /**
      * Converts a usage/limit pair to an integer percentage.
@@ -416,6 +442,8 @@ data class HomeUiState(
     val intervalUsage: Long = 0L,
     val intervalWindowStart: Long = 0L,
     val currentUsage: Long = 0L,
+    val partnerQuotaUsedMillis: Long = 0L,
+    val partnerQuotaGrantedMillis: Long = 0L,
     val progress: Int = 0,
     val showComingSoonSnackBar: Boolean = false,
     val requestReview: Boolean = false,
@@ -529,4 +557,6 @@ private data class UsageSnapshot(
     val intervalWindowStart: Long,
     val currentUsage: Long,
     val sessionSegment: List<SessionSegment>,
+    val partnerQuotaUsedMillis: Long,
+    val partnerQuotaGrantedMillis: Long,
 )

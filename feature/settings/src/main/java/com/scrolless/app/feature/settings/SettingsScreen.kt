@@ -19,6 +19,7 @@ package com.scrolless.app.feature.settings
 import android.content.res.Configuration
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,7 +74,13 @@ import com.scrolless.app.designsystem.util.rememberHapticHelper
 import kotlin.math.roundToInt
 
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    onNavigateBack: () -> Unit,
+    onNavigateToPartners: () -> Unit = {},
+    onNavigateToPartnerMode: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
@@ -83,6 +90,8 @@ fun SettingsScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit, vi
         onExceptReelsSentByDmChange = viewModel::onExceptReelsSentByDmChange,
         onTimerOverlayEnabledChange = viewModel::onTimerOverlayEnabledChange,
         onNavigateBack = onNavigateBack,
+        onNavigateToPartners = onNavigateToPartners,
+        onNavigateToPartnerMode = onNavigateToPartnerMode,
     )
 }
 
@@ -95,6 +104,8 @@ private fun SettingsScreenContent(
     onExceptReelsSentByDmChange: (Boolean) -> Unit,
     onTimerOverlayEnabledChange: (Boolean) -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToPartners: () -> Unit = {},
+    onNavigateToPartnerMode: () -> Unit = {},
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
@@ -183,7 +194,54 @@ private fun SettingsScreenContent(
                     onCheckedChange = onTimerOverlayEnabledChange,
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            SettingsSectionLabel(stringResource(R.string.settings_section_partner_quota))
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            SettingsGroup {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_partner_management_title),
+                    description = stringResource(R.string.settings_partner_management_description),
+                    onClick = onNavigateToPartners,
+                )
+
+                SettingsDivider()
+
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_partner_mode_title),
+                    description = stringResource(R.string.settings_partner_mode_description),
+                    onClick = onNavigateToPartnerMode,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun SettingsNavigationItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val hapticHelper = rememberHapticHelper()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable {
+                hapticHelper.playTick()
+                onClick()
+            }
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

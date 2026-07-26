@@ -244,15 +244,19 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Observe changes to the block config
+        // Observe changes to the block config. Partner-quota grants are included so an
+        // accepted grant code re-initializes the handler and lifts an active block; usage
+        // millis are deliberately excluded to avoid re-init churn on every persist.
         serviceScope.launch {
             val timeLimitFlow = userSettingsStore.getTimeLimit().distinctUntilChanged()
             val intervalLengthFlow = userSettingsStore.getIntervalLength().distinctUntilChanged()
             val blockOptionFlow = userSettingsStore.getActiveBlockOption().distinctUntilChanged()
-            combine(timeLimitFlow, intervalLengthFlow, blockOptionFlow) { _, _, blockOption -> blockOption }.collect { blockOption ->
-                Timber.d("Settings changed, re-initializing blocking manager with %s", blockOption)
-                blockingManager.init(blockOption)
-            }
+            val partnerQuotaGrantFlow = userSettingsStore.getPartnerQuotaGrantedMillis().distinctUntilChanged()
+            combine(timeLimitFlow, intervalLengthFlow, blockOptionFlow, partnerQuotaGrantFlow) { _, _, blockOption, _ -> blockOption }
+                .collect { blockOption ->
+                    Timber.d("Settings changed, re-initializing blocking manager with %s", blockOption)
+                    blockingManager.init(blockOption)
+                }
         }
 
         // Observe timer overlay enabled changes

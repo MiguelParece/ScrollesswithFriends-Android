@@ -26,12 +26,35 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TestSchedulerTimeProvider(private val scheduler: TestCoroutineScheduler) : TimeProvider {
-    override fun currentTimeInMillis() = scheduler.currentTime
+
+    /**
+     * Simulated wall-clock offset. Changing this models the user adjusting the device clock:
+     * the wall clock jumps while elapsed realtime keeps ticking with the scheduler.
+     */
+    var wallClockOffsetMillis: Long = 0L
+
+    /** Simulated boot count; bump via [simulateReboot]. */
+    var bootCountValue: Int = 1
+
+    private var bootBaseMillis: Long = 0L
+
+    override fun currentTimeInMillis() = scheduler.currentTime + wallClockOffsetMillis
+
     override fun localDateNow(): LocalDate {
-        return Instant.ofEpochMilli(scheduler.currentTime).atZone(ZoneId.systemDefault()).toLocalDate()
+        return Instant.ofEpochMilli(currentTimeInMillis()).atZone(ZoneId.systemDefault()).toLocalDate()
     }
 
     override fun localDateTimeNow(): LocalDateTime {
-        return LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduler.currentTime), ZoneId.systemDefault())
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(currentTimeInMillis()), ZoneId.systemDefault())
+    }
+
+    override fun elapsedRealtimeMillis(): Long = scheduler.currentTime - bootBaseMillis
+
+    override fun bootCount(): Int = bootCountValue
+
+    /** Models a reboot: elapsed realtime restarts from zero and the boot count increments. */
+    fun simulateReboot() {
+        bootBaseMillis = scheduler.currentTime
+        bootCountValue += 1
     }
 }

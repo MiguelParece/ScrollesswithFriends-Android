@@ -18,9 +18,15 @@
 <manifest xmlns:tools="http://schemas.android.com/tools"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Offline guarantee: strip INTERNET even if a dependency's manifest requests it.
+         allowBackup stays off so quota/grant state cannot be reset via backup restore. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+
     <application
         android:name=".ScrollessApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
