@@ -171,6 +171,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     private var lastStrictKickElapsed: Long = 0L
 
+    private var lastStrictToastElapsed: Long = 0L
+
+    /** Consecutive guard kicks in quick succession — used to escalate against spam tapping. */
+    private var strictKickStreak: Int = 0
+
     private val appLabel by lazy { getString(R.string.app_name) }
 
     private fun isPauseActive(now: Long = System.currentTimeMillis()): Boolean = pauseUntilMillis > now
@@ -795,6 +800,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      */
     private fun updateServiceConfig(listenToAll: Boolean) {
         val info = serviceInfo ?: return
+        val strictArmed = strictModeManager.isArmed(strictModeState)
 
         if (listenToAll) {
             info.packageNames = null // Listen to all
@@ -807,20 +813,29 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             // disable/uninstall screens keep producing events.
             info.packageNames = buildList {
                 addAll(BlockableApp.entries.flatMap { it.getPackageIds() })
-                if (strictModeManager.isArmed(strictModeState)) {
+                if (strictArmed) {
                     addAll(STRICT_GUARD_PACKAGES)
                 }
             }.toTypedArray()
             Timber.d("Restricted service configuration to target packages only")
         }
+        // Coalescing events costs battery but also reaction time; while the lock is armed a
+        // guarded dialog must be caught before the user can tap through it.
+        info.notificationTimeout = if (strictArmed) 0L else DEFAULT_NOTIFICATION_TIMEOUT_MILLIS
         serviceInfo = info
     }
 
     /**
      * Closes the current guarded system screen when it shows Scrolless — the accessibility
      * toggle, app-info page, uninstall/force-stop dialogs and Settings search results all
-     * render the app label. Kicks are debounced because content-changed events arrive in
-     * bursts.
+     * render the app label.
+     *
+     * The screen is left with HOME rather than BACK: BACK out of an uninstall dialog only
+     * dismisses the dialog and leaves the user on the app-info page with the button back
+     * under their finger, which a fast tapper can ride. Kicks are throttled just enough to
+     * avoid duplicate actions from one burst of events — anything longer hands the user a
+     * window to tap through. Persistent tapping escalates to pulling Scrolless itself to
+     * the foreground, which breaks the loop entirely.
      */
     private fun handleStrictGuardEvent() {
         val rootNode = rootInActiveWindow ?: return
@@ -830,12 +845,24 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         }
         if (showsScrolless) {
             val nowElapsed = SystemClock.elapsedRealtime()
-            if (nowElapsed - lastStrictKickElapsed >= STRICT_KICK_DEBOUNCE_MILLIS) {
+            if (nowElapsed - lastStrictKickElapsed >= STRICT_KICK_MIN_INTERVAL_MILLIS) {
+                val isSpam = nowElapsed - lastStrictKickElapsed <= STRICT_KICK_SPAM_WINDOW_MILLIS
+                strictKickStreak = if (isSpam) strictKickStreak + 1 else 1
                 lastStrictKickElapsed = nowElapsed
-                Timber.i("Strict mode: guarded screen shows %s, navigating back", appLabel)
-                mainHandler.post {
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                    Toast.makeText(this, R.string.strict_mode_active_toast, Toast.LENGTH_SHORT).show()
+
+                if (strictKickStreak >= STRICT_KICK_ESCALATION_STREAK) {
+                    Timber.w("Strict mode: repeated attempts on guarded screen, pulling app to foreground")
+                    bringAppToForeground()
+                } else {
+                    Timber.i("Strict mode: guarded screen shows %s, leaving to home", appLabel)
+                    mainHandler.post { performGlobalAction(GLOBAL_ACTION_HOME) }
+                }
+
+                if (nowElapsed - lastStrictToastElapsed >= STRICT_TOAST_INTERVAL_MILLIS) {
+                    lastStrictToastElapsed = nowElapsed
+                    mainHandler.post {
+                        Toast.makeText(this, R.string.strict_mode_active_toast, Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -995,6 +1022,15 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             "com.android.packageinstaller",
             "com.android.vending",
         )
-        const val STRICT_KICK_DEBOUNCE_MILLIS = 800L
+        /** Only long enough to collapse one burst of events into a single action. */
+        const val STRICT_KICK_MIN_INTERVAL_MILLIS = 150L
+
+        /** Kicks closer together than this count as the user fighting the guard. */
+        const val STRICT_KICK_SPAM_WINDOW_MILLIS = 4_000L
+        const val STRICT_KICK_ESCALATION_STREAK = 3
+        const val STRICT_TOAST_INTERVAL_MILLIS = 3_000L
+
+        /** Matches notificationTimeout in accessibility_service_config.xml. */
+        const val DEFAULT_NOTIFICATION_TIMEOUT_MILLIS = 250L
     }
 }
