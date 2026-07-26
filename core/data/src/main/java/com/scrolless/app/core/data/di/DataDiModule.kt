@@ -35,18 +35,16 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.scrolless.app.core.blocking.time.TimeProvider
-import com.scrolless.app.core.data.crypto.KeystoreGrantCodeSigner
 import com.scrolless.app.core.data.database.ScrollessDatabase
-import com.scrolless.app.core.data.database.dao.PartnerLinkDao
+import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
 import com.scrolless.app.core.data.repository.AndroidTimeProvider
-import com.scrolless.app.core.data.repository.PartnerRepositoryImpl
+import com.scrolless.app.core.data.repository.RedeemedGiftStoreImpl
 import com.scrolless.app.core.data.repository.SessionSegmentStoreImpl
 import com.scrolless.app.core.data.repository.SessionTrackerImpl
 import com.scrolless.app.core.data.repository.UserSettingsStoreImpl
-import com.scrolless.app.core.partner.GrantCodeSigner
-import com.scrolless.app.core.repository.PartnerRepository
+import com.scrolless.app.core.repository.RedeemedGiftStore
 import com.scrolless.app.core.repository.SessionSegmentStore
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
@@ -91,13 +89,10 @@ object DataDiModule {
                                                    pause_duration_millis, except_reels_sent_by_dm,
                                                    partner_quota_window_key, partner_quota_used_millis,
                                                    partner_quota_granted_millis, partner_quota_anchor_wall,
-                                                   partner_quota_anchor_elapsed, partner_quota_anchor_boot,
-                                                   active_challenge, active_challenge_created_wall,
-                                                   active_challenge_created_elapsed, active_challenge_boot,
-                                                   active_challenge_attempts)
+                                                   partner_quota_anchor_elapsed, partner_quota_anchor_boot)
                         VALUES (1, 'NothingSelected', 0, 0, 0, 0, 0, 0, 100, 0, 0, 0,
                                 CAST(strftime('%s','now') AS INTEGER) * 1000, 0, 0, 0, 300000, 0,
-                                '', 0, 0, 0, 0, -1, NULL, 0, 0, -1, 0)
+                                '', 0, 0, 0, 0, -1)
                         """,
                         )
                     }
@@ -119,16 +114,12 @@ object DataDiModule {
 
     @Provides
     @Singleton
-    fun providePartnerLinkDao(database: ScrollessDatabase): PartnerLinkDao = database.partnerLinkDao()
+    fun provideRedeemedGiftDao(database: ScrollessDatabase): RedeemedGiftDao = database.redeemedGiftDao()
 
     @Provides
     @Singleton
-    fun providePartnerRepository(partnerLinkDao: PartnerLinkDao, timeProvider: TimeProvider): PartnerRepository =
-        PartnerRepositoryImpl(partnerLinkDao = partnerLinkDao, timeProvider = timeProvider)
-
-    @Provides
-    @Singleton
-    fun provideGrantCodeSigner(): GrantCodeSigner = KeystoreGrantCodeSigner()
+    fun provideRedeemedGiftStore(redeemedGiftDao: RedeemedGiftDao): RedeemedGiftStore =
+        RedeemedGiftStoreImpl(redeemedGiftDao = redeemedGiftDao)
 
     @Provides
     @Singleton

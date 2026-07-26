@@ -55,9 +55,4 @@ data class UserSettingsEntity(
     @ColumnInfo(name = "partner_quota_anchor_wall", defaultValue = "0") val partnerQuotaAnchorWall: Long = 0L,
     @ColumnInfo(name = "partner_quota_anchor_elapsed", defaultValue = "0") val partnerQuotaAnchorElapsed: Long = 0L,
     @ColumnInfo(name = "partner_quota_anchor_boot", defaultValue = "-1") val partnerQuotaAnchorBoot: Int = -1,
-    @ColumnInfo(name = "active_challenge") val activeChallenge: String? = null,
-    @ColumnInfo(name = "active_challenge_created_wall", defaultValue = "0") val activeChallengeCreatedWall: Long = 0L,
-    @ColumnInfo(name = "active_challenge_created_elapsed", defaultValue = "0") val activeChallengeCreatedElapsed: Long = 0L,
-    @ColumnInfo(name = "active_challenge_boot", defaultValue = "-1") val activeChallengeBoot: Int = -1,
-    @ColumnInfo(name = "active_challenge_attempts", defaultValue = "0") val activeChallengeAttempts: Int = 0,
 )

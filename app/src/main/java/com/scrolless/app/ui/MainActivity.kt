@@ -16,12 +16,16 @@
  */
 package com.scrolless.app.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.scrolless.app.accessibility.ScrollessBlockAccessibilityService
@@ -29,16 +33,20 @@ import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.feature.home.HomeScreen
 import com.scrolless.app.feature.settings.SettingsScreen
-import com.scrolless.app.feature.settings.partner.PartnerManagementScreen
-import com.scrolless.app.feature.settings.partner.PartnerModeScreen
 import com.scrolless.app.util.requestAppReview
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private var pendingGiftCode by mutableStateOf<String?>(null)
+
     @OptIn(ExperimentalSharedTransitionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        extractGiftCode(intent)
 
         setContent {
 
@@ -55,23 +63,13 @@ class MainActivity : ComponentActivity() {
                                     HomeScreen(
                                         onNavigateToSettings = appState::navigateToSettings,
                                         accessibilityServiceClass = ScrollessBlockAccessibilityService::class.java,
+                                        pendingGiftCode = pendingGiftCode,
+                                        onGiftCodeConsumed = { pendingGiftCode = null },
                                         onRequestAppReview = ::requestAppReview,
                                     )
                                 }
                                 entry<ScrollessRoute.Settings> {
                                     SettingsScreen(
-                                        onNavigateBack = appState::navigateBack,
-                                        onNavigateToPartners = appState::navigateToPartnerManagement,
-                                        onNavigateToPartnerMode = appState::navigateToPartnerMode,
-                                    )
-                                }
-                                entry<ScrollessRoute.PartnerManagement> {
-                                    PartnerManagementScreen(
-                                        onNavigateBack = appState::navigateBack,
-                                    )
-                                }
-                                entry<ScrollessRoute.PartnerMode> {
-                                    PartnerModeScreen(
                                         onNavigateBack = appState::navigateBack,
                                     )
                                 }
@@ -80,6 +78,23 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        extractGiftCode(intent)
+    }
+
+    /**
+     * A tapped gift link (`scrolless://gift/<code>`) lands here; the raw URI is handed
+     * to the redeem flow, which extracts the code itself.
+     */
+    private fun extractGiftCode(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "scrolless" && data.host == "gift") {
+            Timber.i("Gift deep link received")
+            pendingGiftCode = data.toString()
         }
     }
 }

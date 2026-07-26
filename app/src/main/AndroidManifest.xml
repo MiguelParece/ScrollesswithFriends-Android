@@ -50,10 +50,20 @@
         <activity
             android:name="com.scrolless.app.ui.MainActivity"
             android:theme="@style/Theme.Scrolless"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Gift deep links: scrolless://gift/<code>, reached via the hosted redirect page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="scrolless"
+                    android:host="gift" />
             </intent-filter>
         </activity>
     </application>

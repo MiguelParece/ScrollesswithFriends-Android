@@ -71,17 +71,19 @@ import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.SETTINGS_TRANSITION_KEY
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.designsystem.util.rememberHapticHelper
+import com.scrolless.app.feature.settings.gift.GiftViewModel
+import com.scrolless.app.feature.settings.gift.SendGiftDialog
 import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit,
-    onNavigateToPartners: () -> Unit = {},
-    onNavigateToPartnerMode: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
+    giftViewModel: GiftViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val giftCode by giftViewModel.giftCode.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
         modifier = modifier,
@@ -90,9 +92,15 @@ fun SettingsScreen(
         onExceptReelsSentByDmChange = viewModel::onExceptReelsSentByDmChange,
         onTimerOverlayEnabledChange = viewModel::onTimerOverlayEnabledChange,
         onNavigateBack = onNavigateBack,
-        onNavigateToPartners = onNavigateToPartners,
-        onNavigateToPartnerMode = onNavigateToPartnerMode,
+        onSendGiftClick = giftViewModel::onCreateGift,
     )
+
+    giftCode?.let { code ->
+        SendGiftDialog(
+            giftCode = code,
+            onDismiss = giftViewModel::onDialogDismissed,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -104,8 +112,7 @@ private fun SettingsScreenContent(
     onExceptReelsSentByDmChange: (Boolean) -> Unit,
     onTimerOverlayEnabledChange: (Boolean) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToPartners: () -> Unit = {},
-    onNavigateToPartnerMode: () -> Unit = {},
+    onSendGiftClick: () -> Unit = {},
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
@@ -203,17 +210,9 @@ private fun SettingsScreenContent(
 
             SettingsGroup {
                 SettingsNavigationItem(
-                    title = stringResource(R.string.settings_partner_management_title),
-                    description = stringResource(R.string.settings_partner_management_description),
-                    onClick = onNavigateToPartners,
-                )
-
-                SettingsDivider()
-
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_partner_mode_title),
-                    description = stringResource(R.string.settings_partner_mode_description),
-                    onClick = onNavigateToPartnerMode,
+                    title = stringResource(R.string.settings_gift_title),
+                    description = stringResource(R.string.settings_gift_description),
+                    onClick = onSendGiftClick,
                 )
             }
         }

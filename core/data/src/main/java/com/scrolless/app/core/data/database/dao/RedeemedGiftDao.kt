@@ -14,25 +14,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.partner
+package com.scrolless.app.core.data.database.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import com.scrolless.app.core.data.database.model.RedeemedGiftEntity
 
 /**
- * Holds pairing secrets and computes grant codes with them. The production implementation
- * backs this with the Android Keystore so an imported secret can never be read back —
- * only used to sign — which is what makes grants unforgeable on a non-rooted device.
+ * [androidx.room.Room] DAO for [RedeemedGiftEntity].
  */
-interface GrantCodeSigner {
+@Dao
+abstract class RedeemedGiftDao {
 
     /**
-     * Imports [secret] under [alias] and wipes the array in place afterwards.
+     * Inserts the nonce, returning -1 when it was already present. The primary-key
+     * conflict makes the redeem-once check atomic.
      */
-    fun importSecret(alias: String, secret: ByteArray)
-
-    /**
-     * Computes the grant code for [challenge] with the key stored under [alias],
-     * or null when no such key exists.
-     */
-    fun computeCode(alias: String, challenge: String): String?
-
-    fun deleteKey(alias: String)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun tryInsert(entity: RedeemedGiftEntity): Long
 }

@@ -87,15 +87,6 @@ interface UserSettingsStore {
         anchorBootCount: Int,
     )
     suspend fun addPartnerQuotaGrant(deltaMillis: Long)
-
-    fun getActiveChallenge(): Flow<String?>
-    fun getActiveChallengeCreatedWall(): Flow<Long>
-    fun getActiveChallengeCreatedElapsed(): Flow<Long>
-    fun getActiveChallengeBoot(): Flow<Int>
-    fun getActiveChallengeAttempts(): Flow<Int>
-    suspend fun setActiveChallenge(challenge: String?, createdWallMillis: Long, createdElapsedMillis: Long, bootCount: Int)
-    suspend fun incrementChallengeAttempts()
-    suspend fun clearActiveChallenge()
 }
 
 suspend fun UserSettingsStore.setTimerOverlayPosition(positionX: Int, positionY: Int) {

@@ -14,44 +14,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.feature.home
+package com.scrolless.app.feature.settings.gift
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scrolless.app.core.partner.PartnerQuotaManager
-import com.scrolless.app.core.partner.RedeemResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 /**
- * Redeems "+15 minutes" gift codes — pasted into the ask-for-more sheet or arriving
- * via a tapped gift deep link.
+ * Generates "+15 minutes" gift codes to send to a friend.
  */
 @HiltViewModel
-class PartnerQuotaViewModel @Inject constructor(private val partnerQuotaManager: PartnerQuotaManager) : ViewModel() {
+class GiftViewModel @Inject constructor(private val partnerQuotaManager: PartnerQuotaManager) : ViewModel() {
 
-    private val _redeemResult = MutableStateFlow<RedeemResult?>(null)
-    val redeemResult: StateFlow<RedeemResult?> = _redeemResult
+    private val _giftCode = MutableStateFlow<String?>(null)
+    val giftCode: StateFlow<String?> = _giftCode
 
-    private val _isRedeeming = MutableStateFlow(false)
-    val isRedeeming: StateFlow<Boolean> = _isRedeeming
-
-    fun onRedeemGift(input: String) {
-        if (_isRedeeming.value) return
+    fun onCreateGift() {
         viewModelScope.launch {
-            _isRedeeming.value = true
-            val result = partnerQuotaManager.redeemGiftCode(input)
-            Timber.d("Gift redemption -> %s", result::class.simpleName)
-            _redeemResult.value = result
-            _isRedeeming.value = false
+            _giftCode.value = partnerQuotaManager.createGiftCode()
         }
     }
 
-    fun onResultConsumed() {
-        _redeemResult.value = null
+    fun onDialogDismissed() {
+        _giftCode.value = null
     }
 }

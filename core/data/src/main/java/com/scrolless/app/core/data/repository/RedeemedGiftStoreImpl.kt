@@ -14,17 +14,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.repository
+package com.scrolless.app.core.data.repository
 
-import com.scrolless.app.core.model.PartnerLink
-import com.scrolless.app.core.model.PartnerRole
-import kotlinx.coroutines.flow.Flow
+import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
+import com.scrolless.app.core.data.database.model.RedeemedGiftEntity
+import com.scrolless.app.core.repository.RedeemedGiftStore
+import javax.inject.Inject
 
-interface PartnerRepository {
+class RedeemedGiftStoreImpl @Inject constructor(private val redeemedGiftDao: RedeemedGiftDao) : RedeemedGiftStore {
 
-    fun getByRole(role: PartnerRole): Flow<List<PartnerLink>>
-
-    suspend fun add(name: String, keystoreAlias: String, role: PartnerRole)
-
-    suspend fun delete(link: PartnerLink)
+    override suspend fun tryMarkRedeemed(nonce: String, redeemedAtMillis: Long): Boolean =
+        redeemedGiftDao.tryInsert(RedeemedGiftEntity(nonce = nonce, redeemedAt = redeemedAtMillis)) != -1L
 }

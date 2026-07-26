@@ -61,11 +61,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _partnerQuotaAnchorWall = MutableStateFlow(0L)
     private val _partnerQuotaAnchorElapsed = MutableStateFlow(0L)
     private val _partnerQuotaAnchorBoot = MutableStateFlow(-1)
-    private val _activeChallenge = MutableStateFlow<String?>(null)
-    private val _activeChallengeCreatedWall = MutableStateFlow(0L)
-    private val _activeChallengeCreatedElapsed = MutableStateFlow(0L)
-    private val _activeChallengeBoot = MutableStateFlow(-1)
-    private val _activeChallengeAttempts = MutableStateFlow(0)
 
     init {
         coroutineScope.launch {
@@ -136,21 +131,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getPartnerQuotaAnchorBoot().collect { _partnerQuotaAnchorBoot.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getActiveChallenge().collect { _activeChallenge.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getActiveChallengeCreatedWall().collect { _activeChallengeCreatedWall.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getActiveChallengeCreatedElapsed().collect { _activeChallengeCreatedElapsed.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getActiveChallengeBoot().collect { _activeChallengeBoot.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getActiveChallengeAttempts().collect { _activeChallengeAttempts.value = it }
         }
     }
 
@@ -321,42 +301,5 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     override suspend fun addPartnerQuotaGrant(deltaMillis: Long) {
         // DB is authoritative for the increment; the collector refreshes the cached flow.
         userSettingsDao.addPartnerQuotaGrant(deltaMillis)
-    }
-
-    override fun getActiveChallenge(): Flow<String?> = _activeChallenge
-
-    override fun getActiveChallengeCreatedWall(): Flow<Long> = _activeChallengeCreatedWall
-
-    override fun getActiveChallengeCreatedElapsed(): Flow<Long> = _activeChallengeCreatedElapsed
-
-    override fun getActiveChallengeBoot(): Flow<Int> = _activeChallengeBoot
-
-    override fun getActiveChallengeAttempts(): Flow<Int> = _activeChallengeAttempts
-
-    override suspend fun setActiveChallenge(challenge: String?, createdWallMillis: Long, createdElapsedMillis: Long, bootCount: Int) {
-        _activeChallenge.value = challenge
-        _activeChallengeCreatedWall.value = createdWallMillis
-        _activeChallengeCreatedElapsed.value = createdElapsedMillis
-        _activeChallengeBoot.value = bootCount
-        _activeChallengeAttempts.value = 0
-        userSettingsDao.setActiveChallenge(
-            challenge = challenge,
-            createdWallMillis = createdWallMillis,
-            createdElapsedMillis = createdElapsedMillis,
-            bootCount = bootCount,
-        )
-    }
-
-    override suspend fun incrementChallengeAttempts() {
-        userSettingsDao.incrementChallengeAttempts()
-    }
-
-    override suspend fun clearActiveChallenge() {
-        _activeChallenge.value = null
-        _activeChallengeCreatedWall.value = 0L
-        _activeChallengeCreatedElapsed.value = 0L
-        _activeChallengeBoot.value = -1
-        _activeChallengeAttempts.value = 0
-        userSettingsDao.clearActiveChallenge()
     }
 }

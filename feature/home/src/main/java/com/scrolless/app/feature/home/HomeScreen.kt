@@ -105,6 +105,7 @@ import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockableApp
 import com.scrolless.app.core.model.SessionSegment
+import com.scrolless.app.core.partner.RedeemResult
 import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.SETTINGS_TRANSITION_KEY
 import com.scrolless.app.designsystem.theme.ScrollessTheme
@@ -114,6 +115,7 @@ import com.scrolless.app.designsystem.theme.progressbar_red_use
 import com.scrolless.app.designsystem.tooling.DevicePreviews
 import com.scrolless.app.designsystem.util.radialGradientScrim
 import com.scrolless.app.designsystem.util.rememberHapticHelper
+import com.scrolless.app.feature.home.components.GiftCelebrationOverlay
 import com.scrolless.app.feature.home.components.InlineUsageAnalyticsPanel
 import com.scrolless.app.feature.home.components.ProgressCard
 import com.scrolless.app.feature.home.components.TodayBlockingControls
@@ -146,15 +148,25 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToSettings: () -> Unit = {},
     accessibilityServiceClass: Class<out AccessibilityService>? = null,
+    pendingGiftCode: String? = null,
+    onGiftCodeConsumed: () -> Unit = {},
     onRequestAppReview: (Activity, (ReviewPromptResult) -> Unit) -> Unit = { _, onResult ->
         onResult(ReviewPromptResult.SkippedPermanent)
     },
     viewModel: HomeViewModel = hiltViewModel(),
+    giftViewModel: PartnerQuotaViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val featureComingSoonMessage = stringResource(R.string.feature_coming_soon)
+
+    val giftRedeemResult by giftViewModel.redeemResult.collectAsStateWithLifecycle()
+    val isRedeemingGift by giftViewModel.isRedeeming.collectAsStateWithLifecycle()
+    var showGiftCelebration by remember { mutableStateOf(false) }
+    val giftLinkErrorInvalid = stringResource(R.string.partner_quota_sheet_invalid)
+    val giftLinkErrorRedeemed = stringResource(R.string.partner_quota_sheet_already_redeemed)
+    val giftLinkErrorExpired = stringResource(R.string.partner_quota_sheet_expired)
 
     var showTimeLimitDialog by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -388,6 +400,15 @@ fun HomeScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(16.dp),
         )
+
+        if (showGiftCelebration) {
+            GiftCelebrationOverlay(
+                onFinished = {
+                    showGiftCelebration = false
+                    giftViewModel.onResultConsumed()
+                },
+            )
+        }
     }
 
     // Show dialog when needed
@@ -435,12 +456,47 @@ fun HomeScreen(
 
     if (showPartnerQuotaRequestSheet) {
         PartnerQuotaRequestSheet(
-            onDismiss = { showPartnerQuotaRequestSheet = false },
-            onOpenSettings = {
+            redeemResult = giftRedeemResult,
+            isRedeeming = isRedeemingGift,
+            onRedeem = giftViewModel::onRedeemGift,
+            onDismiss = {
                 showPartnerQuotaRequestSheet = false
-                onNavigateToSettings()
+                giftViewModel.onResultConsumed()
             },
         )
+    }
+
+    // A gift deep link was tapped in a chat app.
+    LaunchedEffect(pendingGiftCode) {
+        if (pendingGiftCode != null) {
+            Timber.i("Redeeming gift code from deep link")
+            giftViewModel.onRedeemGift(pendingGiftCode)
+            onGiftCodeConsumed()
+        }
+    }
+
+    LaunchedEffect(giftRedeemResult) {
+        when (giftRedeemResult) {
+            RedeemResult.Granted -> {
+                showPartnerQuotaRequestSheet = false
+                showGiftCelebration = true
+            }
+
+            // Errors surface inline while the sheet is open; via snackbar for deep links.
+            RedeemResult.Invalid, RedeemResult.AlreadyRedeemed, RedeemResult.Expired -> {
+                if (!showPartnerQuotaRequestSheet) {
+                    val message = when (giftRedeemResult) {
+                        RedeemResult.AlreadyRedeemed -> giftLinkErrorRedeemed
+                        RedeemResult.Expired -> giftLinkErrorExpired
+                        else -> giftLinkErrorInvalid
+                    }
+                    snackbarHostState.showSnackbar(message)
+                    giftViewModel.onResultConsumed()
+                }
+            }
+
+            null -> Unit
+        }
     }
 
     if (showAccessibilityExplainer) {

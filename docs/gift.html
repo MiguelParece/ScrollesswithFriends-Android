@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  Copyright (C) 2026 Scrolless
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+  Gift redirect page. Chat apps only auto-link https URLs, so gift links point here;
+  this page bounces straight into the app via the scrolless:// scheme. The gift code
+  travels in the URL fragment (#...), which never leaves the browser.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scrolless gift</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+            margin: 0;
+            background: #101418;
+            color: #e6e9ec;
+            text-align: center;
+            padding: 24px;
+        }
+        .emoji { font-size: 72px; margin-bottom: 8px; }
+        h1 { font-size: 1.4rem; margin: 8px 0; }
+        p { color: #9aa4ad; max-width: 32rem; }
+        a.button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 14px 28px;
+            border-radius: 24px;
+            background: #3ddc84;
+            color: #08210f;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        code {
+            display: block;
+            margin-top: 24px;
+            padding: 12px;
+            background: #1c2329;
+            border-radius: 12px;
+            word-break: break-all;
+            color: #e6e9ec;
+        }
+    </style>
+</head>
+<body>
+    <div class="emoji">🎁</div>
+    <h1>Someone gifted you +15 minutes</h1>
+    <p>Opening Scrolless… If nothing happens, tap the button below. No app yet? Install Scrolless, then paste the code into <em>Redeem a gift</em>.</p>
+    <a class="button" id="open" href="#">Open in Scrolless</a>
+    <code id="code"></code>
+    <script>
+        var giftCode = window.location.hash.replace(/^#/, "");
+        var target = "scrolless://gift/" + encodeURIComponent(giftCode);
+        document.getElementById("open").setAttribute("href", target);
+        document.getElementById("code").textContent = giftCode || "No gift code in this link.";
+        if (giftCode) {
+            window.location.href = target;
+        }
+    </script>
+</body>
+</html>

@@ -48,12 +48,6 @@ sealed interface ScrollessRoute : NavKey {
 
     @Serializable
     data object Settings : ScrollessRoute
-
-    @Serializable
-    data object PartnerManagement : ScrollessRoute
-
-    @Serializable
-    data object PartnerMode : ScrollessRoute
 }
 
 @Composable
@@ -66,18 +60,6 @@ class ScrollessAppState(val backStack: NavBackStack<NavKey>) {
     fun navigateToSettings() {
         if (backStack.lastOrNull() != ScrollessRoute.Settings) {
             backStack.add(ScrollessRoute.Settings)
-        }
-    }
-
-    fun navigateToPartnerManagement() {
-        if (backStack.lastOrNull() != ScrollessRoute.PartnerManagement) {
-            backStack.add(ScrollessRoute.PartnerManagement)
-        }
-    }
-
-    fun navigateToPartnerMode() {
-        if (backStack.lastOrNull() != ScrollessRoute.PartnerMode) {
-            backStack.add(ScrollessRoute.PartnerMode)
         }
     }
 

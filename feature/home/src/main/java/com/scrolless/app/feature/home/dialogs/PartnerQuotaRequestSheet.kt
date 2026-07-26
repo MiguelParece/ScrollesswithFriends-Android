@@ -16,64 +16,42 @@
  */
 package com.scrolless.app.feature.home.dialogs
 
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.scrolless.app.core.partner.GrantCodeCrypto
-import com.scrolless.app.core.partner.GrantResult
-import com.scrolless.app.feature.home.PartnerQuotaViewModel
+import com.scrolless.app.core.partner.RedeemResult
 import com.scrolless.app.feature.home.R
 
 /**
- * Bottom sheet of the "ask for more time" flow: shows the current challenge to send to a
- * partner over any channel and verifies the 8-digit code they answer with.
+ * Bottom sheet for redeeming a gift code by pasting the friend's message. Gift links
+ * tapped in a chat app skip this sheet entirely and redeem via deep link.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PartnerQuotaRequestSheet(onDismiss: () -> Unit, onOpenSettings: () -> Unit, viewModel: PartnerQuotaViewModel = hiltViewModel()) {
-    val context = LocalContext.current
+fun PartnerQuotaRequestSheet(redeemResult: RedeemResult?, isRedeeming: Boolean, onRedeem: (String) -> Unit, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    val partners by viewModel.partners.collectAsState()
-    val challenge by viewModel.challenge.collectAsState()
-    val grantResult by viewModel.grantResult.collectAsState()
-    val isVerifying by viewModel.isVerifying.collectAsState()
-    var codeInput by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        viewModel.onSheetOpened()
-    }
+    var pastedText by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -93,36 +71,6 @@ fun PartnerQuotaRequestSheet(onDismiss: () -> Unit, onOpenSettings: () -> Unit, 
                 fontWeight = FontWeight.SemiBold,
             )
 
-            if (partners.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.partner_quota_sheet_no_partners),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-                    Text(text = stringResource(R.string.partner_quota_sheet_open_settings))
-                }
-                return@Column
-            }
-
-            when (val result = grantResult) {
-                is GrantResult.Granted -> {
-                    Text(
-                        text = stringResource(R.string.partner_quota_sheet_granted, result.partnerName),
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(text = stringResource(R.string.partner_quota_sheet_done))
-                    }
-                    return@Column
-                }
-
-                else -> Unit
-            }
-
             Text(
                 text = stringResource(R.string.partner_quota_sheet_instructions),
                 style = MaterialTheme.typography.bodyMedium,
@@ -130,68 +78,27 @@ fun PartnerQuotaRequestSheet(onDismiss: () -> Unit, onOpenSettings: () -> Unit, 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text(
-                text = challenge?.let(GrantCodeCrypto::formatGrouped)
-                    ?: stringResource(R.string.partner_quota_sheet_challenge_loading),
-                style = MaterialTheme.typography.displaySmall,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        val current = challenge ?: return@OutlinedButton
-                        val text = context.getString(
-                            R.string.partner_quota_sheet_share_text,
-                            GrantCodeCrypto.formatGrouped(current),
-                        )
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, text)
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, null))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(text = stringResource(R.string.partner_quota_sheet_share))
-                }
-                OutlinedButton(
-                    onClick = {
-                        codeInput = ""
-                        viewModel.onNewChallenge()
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(text = stringResource(R.string.partner_quota_sheet_new_challenge))
-                }
-            }
-
             OutlinedTextField(
-                value = codeInput,
-                onValueChange = { input -> codeInput = input.filter(Char::isDigit).take(GrantCodeCrypto.CODE_DIGITS) },
+                value = pastedText,
+                onValueChange = { pastedText = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.partner_quota_sheet_code_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                singleLine = true,
-                isError = grantResult is GrantResult.InvalidCode,
+                label = { Text(stringResource(R.string.partner_quota_sheet_paste_label)) },
+                minLines = 2,
+                isError = redeemResult != null && redeemResult != RedeemResult.Granted,
                 supportingText = {
-                    when (val result = grantResult) {
-                        is GrantResult.InvalidCode -> Text(
-                            text = stringResource(R.string.partner_quota_sheet_invalid_code, result.attemptsRemaining),
+                    when (redeemResult) {
+                        RedeemResult.Invalid -> Text(
+                            text = stringResource(R.string.partner_quota_sheet_invalid),
                             color = MaterialTheme.colorScheme.error,
                         )
 
-                        GrantResult.ChallengeExpired -> Text(
-                            text = stringResource(R.string.partner_quota_sheet_challenge_expired),
+                        RedeemResult.AlreadyRedeemed -> Text(
+                            text = stringResource(R.string.partner_quota_sheet_already_redeemed),
                             color = MaterialTheme.colorScheme.error,
                         )
 
-                        GrantResult.TooManyAttempts -> Text(
-                            text = stringResource(R.string.partner_quota_sheet_too_many_attempts),
+                        RedeemResult.Expired -> Text(
+                            text = stringResource(R.string.partner_quota_sheet_expired),
                             color = MaterialTheme.colorScheme.error,
                         )
 
@@ -201,11 +108,11 @@ fun PartnerQuotaRequestSheet(onDismiss: () -> Unit, onOpenSettings: () -> Unit, 
             )
 
             Button(
-                onClick = { viewModel.onSubmitCode(codeInput) },
+                onClick = { onRedeem(pastedText) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isVerifying && codeInput.length == GrantCodeCrypto.CODE_DIGITS && challenge != null,
+                enabled = !isRedeeming && pastedText.isNotBlank(),
             ) {
-                Text(text = stringResource(R.string.partner_quota_sheet_verify))
+                Text(text = stringResource(R.string.partner_quota_sheet_redeem))
             }
 
             Spacer(modifier = Modifier.height(4.dp))

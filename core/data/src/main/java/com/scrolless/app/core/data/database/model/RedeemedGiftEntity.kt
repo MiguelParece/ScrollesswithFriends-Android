@@ -14,21 +14,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.model
+package com.scrolless.app.core.data.database.model
+
+import androidx.compose.runtime.Immutable
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
 /**
- * Which side of an accountability pairing this device plays for a given link.
+ * A gift code nonce that was already redeemed on this device — the single-use guarantee.
  */
-enum class PartnerRole {
-    /** This person grants ME extra time — their key verifies incoming grant codes. */
-    PARTNER,
-
-    /** I grant THEM extra time — the key generates codes for their challenges. */
-    WARD,
-}
-
-/**
- * A paired accountability contact. The HMAC secret itself lives in the Android Keystore
- * under [keystoreAlias]; only this metadata row is stored in the database.
- */
-data class PartnerLink(val id: Long, val name: String, val keystoreAlias: String, val role: PartnerRole, val createdAt: Long)
+@Entity(tableName = "redeemed_gifts")
+@Immutable
+data class RedeemedGiftEntity(
+    @PrimaryKey @ColumnInfo(name = "nonce") val nonce: String,
+    @ColumnInfo(name = "redeemed_at") val redeemedAt: Long,
+)
