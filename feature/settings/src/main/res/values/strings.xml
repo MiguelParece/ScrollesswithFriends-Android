@@ -51,7 +51,7 @@
 
     <string name="gift_share_text">🎁 I’m sending you +15 minutes of Scrolless time!\nTap to redeem: %1$s\nOr paste this whole message into Scrolless: %2$s</string>
 
-    <string name="gift_link_base" translatable="false">https://miguelparece.github.io/ScrollesswithFriends-Android/gift.html#%1$s</string>
+    <string name="gift_link_base" translatable="false">https://miguelparece.github.io/ScrollesswithFriends-Android/docs/gift.html#%1$s</string>
     <string name="settings_show_onscreen_timer_description">Keep a floating timer visible while watching short-form content.</string>
     <string name="settings_show_onscreen_timer_title">Show on-screen timer</string>
     <plurals name="settings_pause_duration_value">
