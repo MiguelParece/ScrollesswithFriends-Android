@@ -37,7 +37,7 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
         SessionSegmentEntity::class,
         RedeemedGiftEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -282,6 +282,12 @@ abstract class ScrollessDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_wall INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_elapsed INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE user_settings ADD COLUMN strict_anchor_boot INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+        // Opt-in counting of the Instagram home feed as blockable content.
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN instagram_feed_blocking_enabled INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

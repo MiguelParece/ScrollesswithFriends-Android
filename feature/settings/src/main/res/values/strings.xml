@@ -55,6 +55,10 @@
 
     <string name="settings_locked_by_strict_mode">Locked while strict mode is on</string>
 
+    <string name="settings_block_instagram_feed_title">Count the Instagram feed</string>
+
+    <string name="settings_block_instagram_feed_description">Limit time on the Instagram home feed too, using the same allowance as Reels. Profile, posts, search and DMs stay open.</string>
+
     <string name="settings_section_strict_mode">Strict mode</string>
 
     <string name="settings_strict_title">Time lock</string>

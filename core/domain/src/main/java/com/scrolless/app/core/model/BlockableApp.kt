@@ -47,6 +47,27 @@ enum class BlockableApp(
         detectionMethod = DetectionMethod.ViewId("clips_viewer_view_pager"),
         exitStrategy = GLOBAL_ACTION_BACK,
     ),
+
+    /**
+     * Instagram's home feed — endless scrolling that is not short-form video.
+     *
+     * Declared after [REELS] on purpose: both match `com.instagram.android`, and the
+     * service resolves an app with `entries.firstNotNullOfOrNull`, so Reels wins the tie.
+     * Never rename or remove this constant — `BlockableAppTypeConverters` persists
+     * `enum.name` into `session_segments.app`, and an unknown name fails reads.
+     *
+     * Exits with HOME rather than BACK: BACK out of the feed can be swallowed, and the
+     * periodic check does not re-arm after acting, which would leave the user unblocked.
+     *
+     * The detection method is a placeholder until the real view IDs are captured from a
+     * device with the debug inspector; combined with the (default off) feed setting, this
+     * entry is inert until then.
+     */
+    INSTAGRAM_FEED(
+        packageIds = listOf("com.instagram.android"),
+        detectionMethod = DetectionMethod.ViewId("scrolless_unset_instagram_feed"),
+        exitStrategy = GLOBAL_ACTION_HOME,
+    ),
     SHORTS(
         packageIds = listOf(
             "com.google.android.youtube",

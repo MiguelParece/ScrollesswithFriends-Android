@@ -42,11 +42,13 @@ class SettingsViewModel @Inject constructor(
         userSettingsStore.getExceptReelsSentByDm(),
         userSettingsStore.getTimerOverlayEnabled(),
         strictModeManager.observeState(),
-    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState ->
+        userSettingsStore.getInstagramFeedBlockingEnabled(),
+    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState, instagramFeedBlockingEnabled ->
         SettingsUiState(
             pauseDurationMinutes = (pauseDurationMillis / 60_000L).toInt().coerceIn(1, 60),
             exceptReelsSentByDm = exceptReelsSentByDm,
             timerOverlayEnabled = timerOverlayEnabled,
+            instagramFeedBlockingEnabled = instagramFeedBlockingEnabled,
             strictModeArmed = strictModeManager.isArmed(strictState),
             strictModeUntilMillis = strictState.untilAtMillis,
             strictModeRemainingMillis = strictModeManager.remainingMillis(strictState),
@@ -74,6 +76,16 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun onInstagramFeedBlockingEnabledChange(checked: Boolean) {
+        // Switching feed blocking off removes protection; strict mode only allows switching it on.
+        if (!StrictModeGuard.canChangeInstagramFeedBlocking(uiState.value.strictModeArmed, checked)) {
+            return
+        }
+        viewModelScope.launch {
+            userSettingsStore.setInstagramFeedBlockingEnabled(checked)
+        }
+    }
+
     fun onTimerOverlayEnabledChange(checked: Boolean) {
         viewModelScope.launch {
             userSettingsStore.setTimerOverlayToggle(checked)
@@ -91,6 +103,7 @@ data class SettingsUiState(
     val pauseDurationMinutes: Int = 5,
     val exceptReelsSentByDm: Boolean = false,
     val timerOverlayEnabled: Boolean = false,
+    val instagramFeedBlockingEnabled: Boolean = false,
     val strictModeArmed: Boolean = false,
     val strictModeUntilMillis: Long = 0L,
     val strictModeRemainingMillis: Long = 0L,

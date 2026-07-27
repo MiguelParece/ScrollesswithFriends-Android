@@ -28,8 +28,11 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import com.scrolless.app.BuildConfig
 import com.scrolless.app.R
+import com.scrolless.app.accessibility.debug.InspectorOverlayManager
 import com.scrolless.app.core.blocking.BlockingManager
+import com.scrolless.app.core.blocking.grace.ContentGracePeriodGate
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockableApp
 import com.scrolless.app.core.model.BlockingResult
@@ -178,6 +181,24 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     private val appLabel by lazy { getString(R.string.app_name) }
 
+    /**
+     * Debug-only tool for capturing the accessibility tree of other apps, which is how
+     * detection rules get written. Deliberately not in the Hilt graph so it cannot reach
+     * a release build.
+     */
+    private val inspectorOverlayManager by lazy { InspectorOverlayManager() }
+
+    /** Whether the Instagram home feed counts as blockable content (opt-in). */
+    private var currentInstagramFeedBlockingEnabled: Boolean = false
+
+    private val instagramFeedGrace = ContentGracePeriodGate(
+        budgetMillis = INSTAGRAM_FEED_GRACE_MILLIS,
+        elapsedRealtimeMillis = SystemClock::elapsedRealtime,
+    )
+
+    /** Separate from [videoCheckHandler] so stopping periodic checks cannot cancel grace re-checks. */
+    private val graceCheckHandler = Handler(Looper.getMainLooper())
+
     private fun isPauseActive(now: Long = System.currentTimeMillis()): Boolean = pauseUntilMillis > now
 
     private val isBlockingSuppressed: Boolean
@@ -256,6 +277,10 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Start with restricted configuration to save battery
         refreshServiceConfig()
 
+        if (BuildConfig.DEBUG) {
+            inspectorOverlayManager.show(this)
+        }
+
         // Check if we need to bring the app to foreground
         serviceScope.launch {
             val waitingForAccessibility = userSettingsStore.getWaitingForAccessibility().distinctUntilChanged()
@@ -294,6 +319,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Observe DM-sent reels exception changes
         serviceScope.launch {
             userSettingsStore.getExceptReelsSentByDm().collect { currentExceptReelsSentByDm = it }
+        }
+
+        // Observe whether the Instagram home feed counts as blockable content
+        serviceScope.launch {
+            userSettingsStore.getInstagramFeedBlockingEnabled().collect { currentInstagramFeedBlockingEnabled = it }
         }
 
         // Observe strict mode state: keep the guard's snapshot fresh, re-anchor after
@@ -347,6 +377,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         }
 
         Timber.i("Handling tracked app exit: %s", reason)
+        cancelGraceExpiryRecheck()
         if (isProcessingBlockedContent) {
             onBlockedContentExited()
         }
@@ -435,7 +466,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         }
 
         // Detect blocked content
-        val detectedContent = detectBlockedContent(packageId, rootNode)
+        val detectedContent = applyGracePeriod(detectBlockedContent(packageId, rootNode))
 
         // Only trigger changes if detection state actually changed
         if (detectedContent != null) {
@@ -448,9 +479,48 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Instagram opens on the feed, so blocking it outright would put DMs out of reach.
+     * Each visit earns a small budget of feed time that is neither enforced nor counted;
+     * withholding the detection until it is spent keeps the session — and therefore both
+     * usage and enforcement — from starting during it.
+     */
+    private fun applyGracePeriod(detected: DetectedBlockedContent?): DetectedBlockedContent? {
+        if (detected?.app?.app != BlockableApp.INSTAGRAM_FEED) {
+            instagramFeedGrace.onContentGone()
+            return detected
+        }
+
+        val remaining = instagramFeedGrace.onContentVisible()
+        if (remaining <= 0L) return detected
+
+        // The feed can go quiet, so enforcement cannot rely on the next event arriving.
+        scheduleGraceExpiryRecheck(remaining)
+        return null
+    }
+
+    private val graceExpiryRunnable = Runnable {
+        val rootNode = rootInActiveWindow ?: return@Runnable
+        val packageId = rootNode.packageName?.toString() ?: return@Runnable
+        applyGracePeriod(detectBlockedContent(packageId, rootNode))?.let(::onBlockedContentDetected)
+    }
+
+    private fun scheduleGraceExpiryRecheck(remainingMillis: Long) {
+        graceCheckHandler.removeCallbacks(graceExpiryRunnable)
+        graceCheckHandler.postDelayed(graceExpiryRunnable, remainingMillis + GRACE_RECHECK_SLACK_MILLIS)
+    }
+
+    private fun cancelGraceExpiryRecheck() {
+        graceCheckHandler.removeCallbacks(graceExpiryRunnable)
+    }
+
     private fun updateForegroundAppState(nextApp: ResolvedBlockableApp?) {
         val previousApp = currentForegroundBrainRotApp
         if (previousApp == nextApp) return
+
+        // Keyed on the package, not the app: both Instagram entries resolve to REELS here.
+        if (previousApp?.packageId == INSTAGRAM_PACKAGE) instagramFeedGrace.onHostAppExited()
+        if (nextApp?.packageId == INSTAGRAM_PACKAGE) instagramFeedGrace.onHostAppEntered()
 
         if (previousApp != null) {
             Timber.v("*** User appears to have left a brain rot app: %s (%s)", previousApp.app.name, previousApp.packageId)
@@ -519,7 +589,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             isProcessingBlockedContent, blockedContentSession?.app,
         )
         stopPeriodicCheck()
+        cancelGraceExpiryRecheck()
         timerOverlayManager.cleanup()
+        if (BuildConfig.DEBUG) {
+            inspectorOverlayManager.cleanup()
+        }
         serviceScope.cancel()
     }
 
@@ -641,6 +715,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     private fun onBlockedContentEntered() {
         val session = blockedContentSession ?: return
         Timber.d("Entered blocked content at %d (app=%s, paused=%b)", session.startedAtMillis, session.app, isPauseActive())
+
+        // Grace is moot once a session exists.
+        cancelGraceExpiryRecheck()
 
         // Expand service scope to detect when user leaves the app (e.g. to launcher)
         refreshServiceConfig()
@@ -816,7 +893,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
                 if (strictArmed) {
                     addAll(STRICT_GUARD_PACKAGES)
                 }
-            }.toTypedArray()
+            }.distinct().toTypedArray()
             Timber.d("Restricted service configuration to target packages only")
         }
         // Coalescing events costs battery but also reaction time; while the lock is armed a
@@ -899,7 +976,27 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      * to support both signals here.
      */
     private fun AccessibilityNodeInfo.matchesBlockedContent(blockableApp: ResolvedBlockableApp): Boolean {
-        return matchesDetectionMethod(blockableApp, blockableApp.getDetectionMethod())
+        if (!isDetectionEnabled(blockableApp.app)) return false
+        if (!matchesDetectionMethod(blockableApp, blockableApp.getDetectionMethod())) return false
+        return !isExcludedContext(blockableApp)
+    }
+
+    /**
+     * Every detection path goes through here, so switching a surface off also ends a
+     * session that is already running, at the next event.
+     */
+    private fun isDetectionEnabled(app: BlockableApp): Boolean = app != BlockableApp.INSTAGRAM_FEED || currentInstagramFeedBlockingEnabled
+
+    /**
+     * Screens that share a positive signal with blocked content but are not it. Kept to
+     * view-id lookups: the feed emits content-changed events constantly, and a tree walk
+     * on each one would be expensive.
+     */
+    private fun AccessibilityNodeInfo.isExcludedContext(blockableApp: ResolvedBlockableApp): Boolean = when (blockableApp.app) {
+        // Filled in once the real Instagram ids are captured with the debug inspector.
+        BlockableApp.INSTAGRAM_FEED -> false
+
+        else -> false
     }
 
     private fun AccessibilityNodeInfo.shouldSuppressBlocking(blockableApp: ResolvedBlockableApp): Boolean {
@@ -1032,5 +1129,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         /** Matches notificationTimeout in accessibility_service_config.xml. */
         const val DEFAULT_NOTIFICATION_TIMEOUT_MILLIS = 250L
+
+        const val INSTAGRAM_PACKAGE = "com.instagram.android"
+
+        /** Time on the feed per Instagram visit that is neither counted nor enforced. */
+        const val INSTAGRAM_FEED_GRACE_MILLIS = 5_000L
+        const val GRACE_RECHECK_SLACK_MILLIS = 100L
     }
 }

@@ -46,6 +46,8 @@
 
     <string name="app_facebook_lite" translatable="false">Facebook Lite</string>
 
+    <string name="app_instagram_feed" translatable="false">Instagram Feed</string>
+
     <string name="app_reels" translatable="false">Reels</string>
 
     <string name="app_shorts" translatable="false">Shorts</string>

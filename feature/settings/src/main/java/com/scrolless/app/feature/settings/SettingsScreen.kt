@@ -97,6 +97,7 @@ fun SettingsScreen(
         onNavigateBack = onNavigateBack,
         onSendGiftClick = giftViewModel::onCreateGift,
         onArmStrictMode = viewModel::onArmStrictMode,
+        onInstagramFeedBlockingEnabledChange = viewModel::onInstagramFeedBlockingEnabledChange,
     )
 
     giftCode?.let { code ->
@@ -118,6 +119,7 @@ private fun SettingsScreenContent(
     onNavigateBack: () -> Unit,
     onSendGiftClick: () -> Unit = {},
     onArmStrictMode: (Long) -> Unit = {},
+    onInstagramFeedBlockingEnabledChange: (Boolean) -> Unit = {},
 ) {
     var showStrictDialog by remember { mutableStateOf(false) }
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -191,6 +193,14 @@ private fun SettingsScreenContent(
                 PauseDurationItem(
                     pauseDurationMinutes = uiState.pauseDurationMinutes,
                     onPauseDurationChange = onPauseDurationChange,
+                )
+
+                SettingsDivider()
+
+                InstagramFeedBlockingItem(
+                    checked = uiState.instagramFeedBlockingEnabled,
+                    onCheckedChange = onInstagramFeedBlockingEnabledChange,
+                    strictModeArmed = uiState.strictModeArmed,
                 )
 
                 SettingsDivider()
@@ -424,6 +434,29 @@ private fun ExceptReelsSentByDmItem(
             stringResource(R.string.settings_locked_by_strict_mode)
         } else {
             stringResource(R.string.settings_except_reels_sent_by_dms_description)
+        },
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = !locked,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun InstagramFeedBlockingItem(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    strictModeArmed: Boolean = false,
+) {
+    // Switching feed blocking off removes protection, so strict mode locks it while on.
+    val locked = strictModeArmed && checked
+    SettingsSwitchItem(
+        title = stringResource(R.string.settings_block_instagram_feed_title),
+        description = if (locked) {
+            stringResource(R.string.settings_locked_by_strict_mode)
+        } else {
+            stringResource(R.string.settings_block_instagram_feed_description)
         },
         checked = checked,
         onCheckedChange = onCheckedChange,

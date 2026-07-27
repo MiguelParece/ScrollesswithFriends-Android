@@ -172,6 +172,12 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
     @Query("UPDATE user_settings SET partner_quota_granted_millis = partner_quota_granted_millis + :deltaMillis WHERE id = 1")
     abstract suspend fun addPartnerQuotaGrant(deltaMillis: Long)
 
+    @Query("SELECT instagram_feed_blocking_enabled FROM user_settings WHERE id = 1")
+    abstract fun getInstagramFeedBlockingEnabled(): Flow<Boolean>
+
+    @Query("UPDATE user_settings SET instagram_feed_blocking_enabled = :enabled WHERE id = 1")
+    abstract suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
+
     @Query("SELECT strict_until_at FROM user_settings WHERE id = 1")
     abstract fun getStrictUntil(): Flow<Long>
 

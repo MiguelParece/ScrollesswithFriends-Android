@@ -88,6 +88,9 @@ interface UserSettingsStore {
     )
     suspend fun addPartnerQuotaGrant(deltaMillis: Long)
 
+    fun getInstagramFeedBlockingEnabled(): Flow<Boolean>
+    suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
+
     fun getStrictUntil(): Flow<Long>
     fun getStrictAnchorWall(): Flow<Long>
     fun getStrictAnchorElapsed(): Flow<Long>

@@ -61,6 +61,7 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _partnerQuotaAnchorWall = MutableStateFlow(0L)
     private val _partnerQuotaAnchorElapsed = MutableStateFlow(0L)
     private val _partnerQuotaAnchorBoot = MutableStateFlow(-1)
+    private val _instagramFeedBlockingEnabled = MutableStateFlow(false)
     private val _strictUntilAt = MutableStateFlow(0L)
     private val _strictAnchorWall = MutableStateFlow(0L)
     private val _strictAnchorElapsed = MutableStateFlow(0L)
@@ -135,6 +136,9 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getPartnerQuotaAnchorBoot().collect { _partnerQuotaAnchorBoot.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getInstagramFeedBlockingEnabled().collect { _instagramFeedBlockingEnabled.value = it }
         }
         coroutineScope.launch {
             userSettingsDao.getStrictUntil().collect { _strictUntilAt.value = it }
@@ -317,6 +321,13 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     override suspend fun addPartnerQuotaGrant(deltaMillis: Long) {
         // DB is authoritative for the increment; the collector refreshes the cached flow.
         userSettingsDao.addPartnerQuotaGrant(deltaMillis)
+    }
+
+    override fun getInstagramFeedBlockingEnabled(): Flow<Boolean> = _instagramFeedBlockingEnabled
+
+    override suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean) {
+        _instagramFeedBlockingEnabled.value = enabled
+        userSettingsDao.setInstagramFeedBlockingEnabled(enabled)
     }
 
     override fun getStrictUntil(): Flow<Long> = _strictUntilAt

@@ -74,6 +74,7 @@ import com.scrolless.app.designsystem.component.AutoResizingText
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.designsystem.theme.facebookColor
 import com.scrolless.app.designsystem.theme.facebookLiteColor
+import com.scrolless.app.designsystem.theme.instagramFeedColor
 import com.scrolless.app.designsystem.theme.instagramReelsColor
 import com.scrolless.app.designsystem.theme.snapchatColor
 import com.scrolless.app.designsystem.theme.tiktokColor
@@ -425,6 +426,7 @@ fun BlockableApp.displayName(context: Context): String = context.getString(
         BlockableApp.FACEBOOK -> R.string.app_facebook
         BlockableApp.FACEBOOK_LITE -> R.string.app_facebook_lite
         BlockableApp.REELS -> R.string.app_reels
+        BlockableApp.INSTAGRAM_FEED -> R.string.app_instagram_feed
         BlockableApp.SNAPCHAT -> R.string.app_snapchat
         BlockableApp.SHORTS -> R.string.app_shorts
         BlockableApp.TIKTOK -> R.string.app_tiktok
@@ -438,6 +440,7 @@ fun BlockableApp.analyticsColor(): Color = when (this) {
     BlockableApp.FACEBOOK -> facebookColor
     BlockableApp.FACEBOOK_LITE -> facebookLiteColor
     BlockableApp.REELS -> instagramReelsColor
+    BlockableApp.INSTAGRAM_FEED -> instagramFeedColor
     BlockableApp.SNAPCHAT -> snapchatColor
     BlockableApp.SHORTS -> youtubeShortsColor
     BlockableApp.TIKTOK -> tiktokColor
