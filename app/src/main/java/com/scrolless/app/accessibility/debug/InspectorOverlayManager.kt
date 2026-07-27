@@ -178,7 +178,7 @@ internal class InspectorOverlayManager {
                 nowMillis = System.currentTimeMillis(),
             )
             view?.visibility = View.VISIBLE
-            val message = result.file?.let { "Dumped ${result.nodeCount} nodes → ${it.name}" }
+            val message = result.location?.let { "Dumped ${result.nodeCount} nodes → $it" }
                 ?: "Dump failed (${result.nodeCount} nodes)"
             Toast.makeText(service, message, Toast.LENGTH_SHORT).show()
         }

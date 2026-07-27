@@ -17,8 +17,13 @@
 package com.scrolless.app.accessibility.debug
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ContentValues
 import android.graphics.Rect
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.annotation.RequiresApi
 import java.io.File
 import java.util.Locale
 import timber.log.Timber
@@ -37,8 +42,10 @@ internal object AccessibilityTreeDumper {
     private const val MAX_DEPTH = 60
     private const val LOG_CHUNK_CHARS = 3_500
     private const val TAG = "TreeDump"
+    private const val DOWNLOADS_SUBFOLDER = "Scrolless"
 
-    data class DumpResult(val nodeCount: Int, val truncated: Boolean, val file: File?)
+    /** @property location where the dump landed, for the confirmation toast; null when writing failed. */
+    data class DumpResult(val nodeCount: Int, val truncated: Boolean, val location: String?)
 
     fun dump(service: AccessibilityService, label: String, nowMillis: Long): DumpResult {
         val builder = StringBuilder()
@@ -73,10 +80,10 @@ internal object AccessibilityTreeDumper {
 
         val text = builder.toString()
         logChunked(text)
-        val file = writeToFile(service, label, nowMillis, text)
+        val location = writeDump(service, label, nowMillis, text)
 
         if (truncated) Timber.tag(TAG).w("Dump truncated at %d nodes", MAX_NODES)
-        return DumpResult(nodeCount = nodeCount, truncated = truncated, file = file)
+        return DumpResult(nodeCount = nodeCount, truncated = truncated, location = location)
     }
 
     /** The locale matters: a detection rule based on a content description only holds for it. */
@@ -118,9 +125,40 @@ internal object AccessibilityTreeDumper {
         }
     }
 
-    private fun writeToFile(service: AccessibilityService, label: String, nowMillis: Long, text: String): File? = try {
+    /**
+     * Writes to the shared Downloads folder, which any file manager can reach — unlike
+     * `Android/data`, which recent Android versions hide from the user. Needs no
+     * permission on API 29+; older versions would, so they keep the app-private folder.
+     */
+    private fun writeDump(service: AccessibilityService, label: String, nowMillis: Long, text: String): String? {
+        val fileName = "tree-$label-$nowMillis.txt"
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            writeToDownloads(service, fileName, text)
+        } else {
+            writeToAppFolder(service, fileName, text)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun writeToDownloads(service: AccessibilityService, fileName: String, text: String): String? = try {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$DOWNLOADS_SUBFOLDER")
+        }
+        val resolver = service.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("MediaStore refused the insert")
+        resolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("No output stream for $uri")
+        "Download/$DOWNLOADS_SUBFOLDER/$fileName"
+    } catch (e: Exception) {
+        Timber.tag(TAG).e(e, "Failed to write dump to Downloads, falling back to app folder")
+        writeToAppFolder(service, fileName, text)
+    }
+
+    private fun writeToAppFolder(service: AccessibilityService, fileName: String, text: String): String? = try {
         val directory = File(service.getExternalFilesDir(null), "inspector").apply { mkdirs() }
-        File(directory, "tree-$label-$nowMillis.txt").apply { writeText(text) }
+        File(directory, fileName).apply { writeText(text) }.absolutePath
     } catch (e: Exception) {
         Timber.tag(TAG).e(e, "Failed to write dump file")
         null
