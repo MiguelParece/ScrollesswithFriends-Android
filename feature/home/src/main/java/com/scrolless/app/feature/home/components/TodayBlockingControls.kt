@@ -87,6 +87,7 @@ import androidx.compose.ui.unit.sp
 import com.scrolless.app.core.blocking.handler.PartnerQuotaBlockHandler
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.QuotaWindow
+import com.scrolless.app.core.strict.StrictModeGuard
 import com.scrolless.app.designsystem.component.AutoResizingText
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.designsystem.tooling.DevicePreviews
@@ -242,6 +243,7 @@ fun TodayBlockingControls(
             dailyLimitAnimatedWeight = dailyLimitWeight,
             intervalAnimatedWeight = intervalWeight,
             partnerQuotaAnimatedWeight = partnerQuotaWeight,
+            strictModeArmed = uiState.strictModeArmed,
         )
 
         AnimatedVisibility(
@@ -346,6 +348,7 @@ fun TodayBlockingControls(
                     isPaused = isPauseActive,
                     remainingMillis = pauseRemainingMillis,
                     pauseDurationMinutes = (uiState.pauseDurationMillis / 60_000L).toInt().coerceAtLeast(1),
+                    strictModeArmed = uiState.strictModeArmed,
                 )
             }
         }
@@ -578,9 +581,12 @@ fun PauseButton(
     isPaused: Boolean,
     remainingMillis: Long,
     pauseDurationMinutes: Int = 5,
+    strictModeArmed: Boolean = false,
 ) {
 
     val hapticHelper = rememberHapticHelper()
+    // Pausing would suspend blocking entirely, so strict mode only allows cancelling one.
+    val isPauseLocked = strictModeArmed && !isPaused
 
     val buttonShape = RoundedCornerShape(20.dp)
     val containerColor by animateColorAsState(
@@ -625,6 +631,7 @@ fun PauseButton(
                 hapticHelper.playToggle(isPaused)
                 onTogglePause(!isPaused)
             },
+            enabled = !isPauseLocked,
             shape = buttonShape,
             border = BorderStroke(1.dp, borderColor),
             colors = ButtonDefaults.buttonColors(
@@ -651,10 +658,10 @@ fun PauseButton(
             modifier = Modifier.padding(top = 8.dp),
             label = "pauseButtonSupportingText",
         ) { paused ->
-            val text = if (paused) {
-                stringResource(id = R.string.pause_resumes_in, remainingMillis.toCountdownLabel())
-            } else {
-                stringResource(id = R.string.pause_duration_hint, pauseDurationMinutes)
+            val text = when {
+                paused -> stringResource(id = R.string.pause_resumes_in, remainingMillis.toCountdownLabel())
+                isPauseLocked -> stringResource(id = R.string.strict_mode_locked_hint)
+                else -> stringResource(id = R.string.pause_duration_hint, pauseDurationMinutes)
             }
             Text(
                 text = text,
@@ -687,7 +694,17 @@ fun FeatureButtonsRow(
     intervalAnimatedWeight: Float,
     partnerQuotaAnimatedWeight: Float,
     modifier: Modifier = Modifier,
+    strictModeArmed: Boolean = false,
 ) {
+    /**
+     * Tapping the selected option deselects it, so while strict mode is armed the active
+     * option is locked, as is any option that protects less than the current one.
+     */
+    fun isOptionAvailable(option: BlockOption): Boolean {
+        val target = if (selectedOption == option) BlockOption.NothingSelected else option
+        return StrictModeGuard.canChangeBlockOption(strictModeArmed, selectedOption, target)
+    }
+
     ButtonGroup(
         overflowIndicator = {},
         modifier = modifier
@@ -703,6 +720,7 @@ fun FeatureButtonsRow(
                     contentDescription = stringResource(id = R.string.block_all),
                     isSelected = selectedOption == BlockOption.BlockAll,
                     interactionSource = blockAllInteractionSource,
+                    isEnabled = isOptionAvailable(BlockOption.BlockAll),
                     modifier = Modifier.weight(blockAllAnimatedWeight),
                 )
             },
@@ -718,6 +736,7 @@ fun FeatureButtonsRow(
                     contentDescription = stringResource(id = R.string.daily_limit),
                     isSelected = selectedOption == BlockOption.DailyLimit,
                     interactionSource = dailyLimitInteractionSource,
+                    isEnabled = isOptionAvailable(BlockOption.DailyLimit),
                     modifier = Modifier.weight(dailyLimitAnimatedWeight),
                 )
             },
@@ -738,6 +757,7 @@ fun FeatureButtonsRow(
                         contentDescription = stringResource(id = R.string.time_interval),
                         isSelected = selectedOption == BlockOption.IntervalTimer,
                         interactionSource = intervalInteractionSource,
+                        isEnabled = isOptionAvailable(BlockOption.IntervalTimer),
                         modifier = Modifier.fillMaxSize(),
                     )
 
@@ -763,6 +783,7 @@ fun FeatureButtonsRow(
                     contentDescription = stringResource(id = R.string.partner_quota),
                     isSelected = selectedOption == BlockOption.PartnerQuota,
                     interactionSource = partnerQuotaInteractionSource,
+                    isEnabled = isOptionAvailable(BlockOption.PartnerQuota),
                     modifier = Modifier.weight(partnerQuotaAnimatedWeight),
                 )
             },

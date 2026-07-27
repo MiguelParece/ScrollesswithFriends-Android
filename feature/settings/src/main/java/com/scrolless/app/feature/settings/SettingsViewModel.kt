@@ -19,6 +19,7 @@ package com.scrolless.app.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scrolless.app.core.repository.UserSettingsStore
+import com.scrolless.app.core.strict.StrictModeGuard
 import com.scrolless.app.core.strict.StrictModeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -64,6 +65,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onExceptReelsSentByDmChange(checked: Boolean) {
+        // Exempting DM reels removes protection, so strict mode only allows switching it off.
+        if (!StrictModeGuard.canChangeExceptReelsSentByDm(uiState.value.strictModeArmed, checked)) {
+            return
+        }
         viewModelScope.launch {
             userSettingsStore.setExceptReelsSentByDm(checked)
         }

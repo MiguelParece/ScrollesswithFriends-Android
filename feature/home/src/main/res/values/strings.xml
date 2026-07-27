@@ -135,6 +135,10 @@
 
     <string name="partner_quota_gift_celebration">+15 minutes!</string>
 
+    <string name="strict_mode_locked_hint">Locked by strict mode</string>
+
+    <string name="strict_mode_locked_message">Strict mode is on — you can make blocking stricter, but not weaker, until the timer ends</string>
+
     <string name="interval_timer_dialog_allowance_description">How long you can watch shorts once a break starts.</string>
 
     <string name="interval_timer_dialog_allowance_label">Allowed watch time</string>

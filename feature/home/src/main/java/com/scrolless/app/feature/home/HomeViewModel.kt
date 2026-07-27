@@ -26,6 +26,8 @@ import com.scrolless.app.core.model.usage.DailyUsageTotal
 import com.scrolless.app.core.model.usage.calculateWeekdayAverages
 import com.scrolless.app.core.repository.SessionSegmentStore
 import com.scrolless.app.core.repository.UserSettingsStore
+import com.scrolless.app.core.strict.StrictModeGuard
+import com.scrolless.app.core.strict.StrictModeManager
 import com.scrolless.app.core.util.combine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Duration
@@ -57,9 +59,11 @@ private const val FIRST_LAUNCH_LOADING = -1L
 class HomeViewModel @Inject constructor(
     private val userSettingsStore: UserSettingsStore,
     private val sessionSegmentStore: SessionSegmentStore,
+    private val strictModeManager: StrictModeManager,
 ) : ViewModel() {
 
     private val _showComingSoonSnackBar = MutableStateFlow(false)
+    private val _showStrictModeLockedMessage = MutableStateFlow(false)
     private val _selectedAveragePeriod = MutableStateFlow(UsageAveragePeriod.LAST_WEEK)
     private val selectedAnalyticsDate = MutableStateFlow(ZonedDateTime.now().toLocalDate())
     private val currentDate = currentDayFlow().stateIn(
@@ -184,6 +188,13 @@ class HomeViewModel @Inject constructor(
         )
     }
 
+    private val strictModeSnapshot = combine(
+        strictModeManager.observeState(),
+        _showStrictModeLockedMessage,
+    ) { state, showLockedMessage ->
+        StrictModeSnapshot(armed = strictModeManager.isArmed(state), showLockedMessage = showLockedMessage)
+    }
+
     val uiState: StateFlow<HomeUiState> = combine(
         usageSnapshot,
         userSettingsStore.getPauseUntil(),
@@ -193,6 +204,7 @@ class HomeViewModel @Inject constructor(
         userSettingsStore.getPauseDuration(),
         analyticsSnapshot,
         _selectedAveragePeriod,
+        strictModeSnapshot,
     ) {
             usage,
             pauseUntil,
@@ -202,6 +214,7 @@ class HomeViewModel @Inject constructor(
             pauseDuration,
             analytics,
             averagePeriod,
+            strictMode,
         ->
 
         val progress = calculateProgress(
@@ -232,6 +245,8 @@ class HomeViewModel @Inject constructor(
             listSessionSegments = usage.sessionSegment,
             usageAnalytics = analytics,
             averagePeriod = averagePeriod,
+            strictModeArmed = strictMode.armed,
+            showStrictModeLockedMessage = strictMode.showLockedMessage,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -240,6 +255,12 @@ class HomeViewModel @Inject constructor(
     )
 
     fun onBlockOptionSelected(blockOption: BlockOption) {
+        val state = uiState.value
+        if (!StrictModeGuard.canChangeBlockOption(state.strictModeArmed, state.blockOption, blockOption)) {
+            Timber.i("Block option change to %s refused by strict mode", blockOption)
+            _showStrictModeLockedMessage.value = true
+            return
+        }
         Timber.i("Block option selected: %s", blockOption)
         viewModelScope.launch {
             userSettingsStore.setActiveBlockOption(blockOption)
@@ -250,6 +271,14 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onTimeLimitChange(durationMillis: Long) {
+        val state = uiState.value
+        val allowed = StrictModeGuard.canChangeBlockOption(state.strictModeArmed, state.blockOption, BlockOption.DailyLimit) &&
+            StrictModeGuard.canChangeTimeLimit(state.strictModeArmed, state.timeLimit, durationMillis)
+        if (!allowed) {
+            Timber.i("Time limit change to %d ms refused by strict mode", durationMillis)
+            _showStrictModeLockedMessage.value = true
+            return
+        }
         Timber.d("Time limit changed: %d ms", durationMillis)
         viewModelScope.launch {
             userSettingsStore.setActiveBlockOption(BlockOption.DailyLimit)
@@ -258,7 +287,13 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onPauseToggle(shouldPause: Boolean) {
-        val pauseDuration = uiState.value.pauseDurationMillis.takeIf { it > 0 } ?: (5 * 60 * 1000L)
+        val state = uiState.value
+        if (!StrictModeGuard.canPause(state.strictModeArmed, shouldPause)) {
+            Timber.i("Pause refused by strict mode")
+            _showStrictModeLockedMessage.value = true
+            return
+        }
+        val pauseDuration = state.pauseDurationMillis.takeIf { it > 0 } ?: (5 * 60 * 1000L)
         val targetTimestamp = if (shouldPause) {
             System.currentTimeMillis() + pauseDuration
         } else {
@@ -275,6 +310,20 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onIntervalTimerConfigChange(intervalBreakMillis: Long, allowanceMillis: Long) {
+        val state = uiState.value
+        val allowed = StrictModeGuard.canChangeBlockOption(state.strictModeArmed, state.blockOption, BlockOption.IntervalTimer) &&
+            StrictModeGuard.canChangeIntervalConfig(
+                armed = state.strictModeArmed,
+                currentAllowanceMillis = state.timeLimit,
+                currentIntervalMillis = state.intervalLength,
+                nextAllowanceMillis = allowanceMillis,
+                nextIntervalMillis = intervalBreakMillis,
+            )
+        if (!allowed) {
+            Timber.i("Interval timer change refused by strict mode")
+            _showStrictModeLockedMessage.value = true
+            return
+        }
         Timber.d(
             "Interval timer config change: break=%d ms, allowance=%d ms",
             intervalBreakMillis,
@@ -286,6 +335,10 @@ class HomeViewModel @Inject constructor(
             userSettingsStore.updateIntervalState(windowStart = 0L, usage = 0L)
             userSettingsStore.setActiveBlockOption(BlockOption.IntervalTimer)
         }
+    }
+
+    fun onStrictModeLockedMessageShown() {
+        _showStrictModeLockedMessage.value = false
     }
 
     /**
@@ -467,6 +520,10 @@ data class HomeUiState(
     val listSessionSegments: List<SessionSegment> = emptyList(),
     val usageAnalytics: UsageAnalyticsUiState = UsageAnalyticsUiState(),
     val averagePeriod: UsageAveragePeriod = UsageAveragePeriod.LAST_WEEK,
+
+    /** While armed, settings may only be tightened — see [com.scrolless.app.core.strict.StrictModeGuard]. */
+    val strictModeArmed: Boolean = false,
+    val showStrictModeLockedMessage: Boolean = false,
 )
 
 private fun buildUsageAnalyticsUiState(
@@ -548,6 +605,8 @@ private fun buildUsageAnalyticsDayUiState(date: LocalDate, segments: List<Sessio
         appTotals = appTotals,
     )
 }
+
+private data class StrictModeSnapshot(val armed: Boolean, val showLockedMessage: Boolean)
 
 private data class UsageSnapshot(
     val blockOption: BlockOption,

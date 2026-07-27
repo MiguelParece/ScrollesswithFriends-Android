@@ -53,6 +53,8 @@
 
     <string name="gift_link_base" translatable="false">https://miguelparece.github.io/ScrollesswithFriends-Android/docs/gift.html#%1$s</string>
 
+    <string name="settings_locked_by_strict_mode">Locked while strict mode is on</string>
+
     <string name="settings_section_strict_mode">Strict mode</string>
 
     <string name="settings_strict_title">Time lock</string>

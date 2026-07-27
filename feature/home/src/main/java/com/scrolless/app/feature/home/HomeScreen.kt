@@ -160,6 +160,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val featureComingSoonMessage = stringResource(R.string.feature_coming_soon)
+    val strictModeLockedMessage = stringResource(R.string.strict_mode_locked_message)
 
     val giftRedeemResult by giftViewModel.redeemResult.collectAsStateWithLifecycle()
     val isRedeemingGift by giftViewModel.isRedeeming.collectAsStateWithLifecycle()
@@ -255,6 +256,14 @@ fun HomeScreen(
             Timber.i("Showing 'feature coming soon' snackbar")
             snackbarHostState.showSnackbar(featureComingSoonMessage)
             viewModel.onSnackbarShown()
+        }
+    }
+
+    // A control that would weaken blocking was used while the strict lock is armed.
+    LaunchedEffect(uiState.showStrictModeLockedMessage) {
+        if (uiState.showStrictModeLockedMessage) {
+            snackbarHostState.showSnackbar(strictModeLockedMessage)
+            viewModel.onStrictModeLockedMessageShown()
         }
     }
 

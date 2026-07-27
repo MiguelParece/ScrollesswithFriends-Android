@@ -198,6 +198,7 @@ private fun SettingsScreenContent(
                 ExceptReelsSentByDmItem(
                     checked = uiState.exceptReelsSentByDm,
                     onCheckedChange = onExceptReelsSentByDmChange,
+                    strictModeArmed = uiState.strictModeArmed,
                 )
 
                 SettingsDivider()
@@ -409,12 +410,24 @@ private fun SettingsValuePill(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ExceptReelsSentByDmItem(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+private fun ExceptReelsSentByDmItem(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    strictModeArmed: Boolean = false,
+) {
+    // Turning this on exempts DM reels from blocking, so strict mode locks it while off.
+    val locked = strictModeArmed && !checked
     SettingsSwitchItem(
         title = stringResource(R.string.settings_except_reels_sent_by_dms_title),
-        description = stringResource(R.string.settings_except_reels_sent_by_dms_description),
+        description = if (locked) {
+            stringResource(R.string.settings_locked_by_strict_mode)
+        } else {
+            stringResource(R.string.settings_except_reels_sent_by_dms_description)
+        },
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = !locked,
         modifier = modifier,
     )
 }
@@ -437,6 +450,7 @@ private fun SettingsSwitchItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val hapticHelper = rememberHapticHelper()
     Row(
@@ -463,6 +477,7 @@ private fun SettingsSwitchItem(
         }
         Switch(
             checked = checked,
+            enabled = enabled,
             onCheckedChange = { isOn ->
                 hapticHelper.playToggle(isOn)
                 onCheckedChange(isOn)
