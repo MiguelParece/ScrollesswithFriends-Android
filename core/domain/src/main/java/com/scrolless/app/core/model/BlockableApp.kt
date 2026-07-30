@@ -24,7 +24,12 @@ import androidx.compose.runtime.Immutable
 // Most of the apps work by just checking if the view id is present
 //  but facebook (thanks) needs to be different and only works via content descriptions which is a nice hammer
 sealed class DetectionMethod {
-    data class ViewId(val viewId: String) : DetectionMethod()
+    /**
+     * @property requireSelected when true the node must also report `isSelected`. Needed for
+     *   signals that exist on every screen of an app and only mean something when active,
+     *   such as a bottom-navigation tab.
+     */
+    data class ViewId(val viewId: String, val requireSelected: Boolean = false) : DetectionMethod()
     data class ContentDescriptions(val contentDescriptions: Set<String>) : DetectionMethod()
     data class ContentDescriptionPrefix(
         val prefixes: Set<String>,
@@ -59,13 +64,16 @@ enum class BlockableApp(
      * Exits with HOME rather than BACK: BACK out of the feed can be swallowed, and the
      * periodic check does not re-arm after acting, which would leave the user unblocked.
      *
-     * The detection method is a placeholder until the real view IDs are captured from a
-     * device with the debug inspector; combined with the (default off) feed setting, this
-     * entry is inert until then.
+     * Detected by the home tab of the bottom navigation being selected. Device captures
+     * showed this is the only signal that separates the feed from everything else: the
+     * feed's list container and post headers are reused verbatim when a single post is
+     * opened from a profile grid, so matching those would count reading one post as
+     * scrolling. The tab is a view ID, so unlike the "For you" title it does not depend
+     * on the device language.
      */
     INSTAGRAM_FEED(
         packageIds = listOf("com.instagram.android"),
-        detectionMethod = DetectionMethod.ViewId("scrolless_unset_instagram_feed"),
+        detectionMethod = DetectionMethod.ViewId("feed_tab", requireSelected = true),
         exitStrategy = GLOBAL_ACTION_HOME,
     ),
     SHORTS(

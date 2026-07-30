@@ -18,6 +18,7 @@ package com.scrolless.app.core.domain.model
 
 import com.scrolless.app.core.domain.BaseTest
 import com.scrolless.app.core.model.BlockableApp
+import com.scrolless.app.core.model.DetectionMethod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,6 +46,29 @@ class BlockableAppTest : BaseTest() {
             listOf("REELS", "INSTAGRAM_FEED", "SHORTS", "TIKTOK", "FACEBOOK", "FACEBOOK_LITE", "SNAPCHAT"),
             BlockableApp.entries.map { it.name },
         )
+    }
+
+    /**
+     * Captured from a real device: `feed_tab` exists on the profile, Explore and inbox
+     * screens too, and is only selected on the home feed. Dropping `requireSelected`
+     * would make every Instagram screen count as scrolling.
+     */
+    @Test
+    fun instagramFeedIsDetectedByTheSelectedHomeTab() {
+        val method = BlockableApp.INSTAGRAM_FEED.getDetectionMethod()
+
+        assertTrue(method is DetectionMethod.ViewId)
+        val viewId = method as DetectionMethod.ViewId
+        assertEquals("feed_tab", viewId.viewId)
+        assertTrue("the home tab is only meaningful when selected", viewId.requireSelected)
+    }
+
+    /** Reels must keep matching the clips viewer, which the feed signal never sees. */
+    @Test
+    fun reelsIsDetectedByTheClipsViewer() {
+        val method = BlockableApp.REELS.getDetectionMethod()
+
+        assertEquals(DetectionMethod.ViewId("clips_viewer_view_pager"), method)
     }
 
     @Test

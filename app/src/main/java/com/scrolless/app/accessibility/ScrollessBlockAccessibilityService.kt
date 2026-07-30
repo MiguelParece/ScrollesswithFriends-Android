@@ -977,8 +977,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      */
     private fun AccessibilityNodeInfo.matchesBlockedContent(blockableApp: ResolvedBlockableApp): Boolean {
         if (!isDetectionEnabled(blockableApp.app)) return false
-        if (!matchesDetectionMethod(blockableApp, blockableApp.getDetectionMethod())) return false
-        return !isExcludedContext(blockableApp)
+        return matchesDetectionMethod(blockableApp, blockableApp.getDetectionMethod())
     }
 
     /**
@@ -986,18 +985,6 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      * session that is already running, at the next event.
      */
     private fun isDetectionEnabled(app: BlockableApp): Boolean = app != BlockableApp.INSTAGRAM_FEED || currentInstagramFeedBlockingEnabled
-
-    /**
-     * Screens that share a positive signal with blocked content but are not it. Kept to
-     * view-id lookups: the feed emits content-changed events constantly, and a tree walk
-     * on each one would be expensive.
-     */
-    private fun AccessibilityNodeInfo.isExcludedContext(blockableApp: ResolvedBlockableApp): Boolean = when (blockableApp.app) {
-        // Filled in once the real Instagram ids are captured with the debug inspector.
-        BlockableApp.INSTAGRAM_FEED -> false
-
-        else -> false
-    }
 
     private fun AccessibilityNodeInfo.shouldSuppressBlocking(blockableApp: ResolvedBlockableApp): Boolean {
         return blockableApp.app == BlockableApp.REELS &&
@@ -1011,7 +998,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     ): Boolean {
         return when (detectionMethod) {
             is DetectionMethod.ViewId ->
-                findAccessibilityNodeInfosByViewId(blockableApp.getViewId(detectionMethod)).any(::isNodeVisibleToTheUser)
+                findAccessibilityNodeInfosByViewId(blockableApp.getViewId(detectionMethod)).any { node ->
+                    isNodeVisibleToTheUser(node) && (!detectionMethod.requireSelected || node.isSelected)
+                }
 
             is DetectionMethod.ContentDescriptions ->
                 hasVisibleContentDescription(detectionMethod.contentDescriptions)
