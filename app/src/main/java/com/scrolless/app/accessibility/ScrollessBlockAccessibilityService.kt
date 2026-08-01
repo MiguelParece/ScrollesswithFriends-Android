@@ -191,6 +191,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     /** Whether the Instagram home feed counts as blockable content (opt-in). */
     private var currentInstagramFeedBlockingEnabled: Boolean = false
 
+    /** Active blocking strategy, used to pick which counter the overlay resumes from. */
+    private var currentBlockOption: BlockOption = BlockOption.NothingSelected
+
     private val instagramFeedGrace = ContentGracePeriodGate(
         budgetMillis = INSTAGRAM_FEED_GRACE_MILLIS,
         elapsedRealtimeMillis = SystemClock::elapsedRealtime,
@@ -317,6 +320,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             combine(timeLimitFlow, intervalLengthFlow, blockOptionFlow, partnerQuotaGrantFlow) { _, _, blockOption, _ -> blockOption }
                 .collect { blockOption ->
                     Timber.d("Settings changed, re-initializing blocking manager with %s", blockOption)
+                    currentBlockOption = blockOption
                     blockingManager.init(blockOption)
                 }
         }
@@ -745,10 +749,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
                 } else {
                     // Only show timer overlay if we're NOT blocking immediately
                     // (no point showing timer if user is about to be kicked out)
+                    val alreadyUsed = usedMillisAgainstActiveLimit()
                     mainHandler.post {
                         if (currentTimerOverlayEnabled && isProcessingBlockedContent) {
                             Timber.v("Showing timer overlay")
-                            timerOverlayManager.show(session.startedAtMillis)
+                            timerOverlayManager.show(session.startedAtMillis, alreadyUsed)
                         }
                     }
                     Timber.d("Content allowed on enter, will monitor usage")
@@ -758,8 +763,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             // Paused or blocking-suppressed content still counts as watched time.
             if (currentTimerOverlayEnabled) {
                 Timber.v("Showing timer overlay (blocking skipped)")
-                mainHandler.post {
-                    timerOverlayManager.show(session.startedAtMillis)
+                serviceScope.launch {
+                    val alreadyUsed = usedMillisAgainstActiveLimit()
+                    timerOverlayManager.show(session.startedAtMillis, alreadyUsed)
                 }
             }
             Timber.d(
@@ -768,6 +774,18 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
                 isBlockingSuppressedForCurrentContent,
             )
         }
+    }
+
+    /**
+     * How much of the active limit is already spent, so the overlay can carry on from
+     * there. Each counter is only written when a session ends, so it never includes the
+     * session that is starting now and the overlay cannot double-count.
+     */
+    private suspend fun usedMillisAgainstActiveLimit(): Long = when (currentBlockOption) {
+        BlockOption.IntervalTimer -> userSettingsStore.getIntervalUsage().first()
+        BlockOption.PartnerQuota -> userSettingsStore.getPartnerQuotaUsedMillis().first()
+        BlockOption.DailyLimit -> sessionTracker.getDailyUsage()
+        BlockOption.BlockAll, BlockOption.NothingSelected -> 0L
     }
 
     /**

@@ -74,6 +74,13 @@ class TimerOverlayManager @Inject constructor(private val userSettingsStore: Use
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var sessionStartTime = 0L
+
+    /**
+     * Time already spent on blocked content before this session, so the overlay keeps
+     * counting where it left off instead of restarting every time the user steps out and
+     * comes back — what matters is the total against the limit, not the current visit.
+     */
+    private var baselineMillis = 0L
     private var timerJob: Job? = null
     private var exitAnimationJob: Job? = null
     private var screenBounds: ScreenBounds? = null
@@ -91,7 +98,7 @@ class TimerOverlayManager @Inject constructor(private val userSettingsStore: Use
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    fun show(sessionStartAt: Long = System.currentTimeMillis()) {
+    fun show(sessionStartAt: Long = System.currentTimeMillis(), alreadyUsedMillis: Long = 0L) {
         if (rootView != null) {
             cleanupView()
         }
@@ -102,6 +109,7 @@ class TimerOverlayManager @Inject constructor(private val userSettingsStore: Use
         val wm = windowManager ?: return
 
         sessionStartTime = sessionStartAt
+        baselineMillis = alreadyUsedMillis.coerceAtLeast(0L)
 
         // Create TextView with polished styling
         timerTextView = TextView(serviceContext).apply {
@@ -225,7 +233,7 @@ class TimerOverlayManager @Inject constructor(private val userSettingsStore: Use
         timerJob = coroutineScope.launch {
             while (true) {
                 val elapsed = (System.currentTimeMillis() - sessionStartTime).coerceAtLeast(0L)
-                timerTextView?.text = elapsed.formatAsTime()
+                timerTextView?.text = (baselineMillis + elapsed).formatAsTime()
                 delay(1000)
             }
         }
