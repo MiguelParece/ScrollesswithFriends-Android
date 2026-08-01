@@ -60,4 +60,5 @@ data class UserSettingsEntity(
     @ColumnInfo(name = "strict_anchor_elapsed", defaultValue = "0") val strictAnchorElapsed: Long = 0L,
     @ColumnInfo(name = "strict_anchor_boot", defaultValue = "-1") val strictAnchorBoot: Int = -1,
     @ColumnInfo(name = "instagram_feed_blocking_enabled", defaultValue = "0") val instagramFeedBlockingEnabled: Boolean = false,
+    @ColumnInfo(name = "inspector_overlay_enabled", defaultValue = "0") val inspectorOverlayEnabled: Boolean = false,
 )

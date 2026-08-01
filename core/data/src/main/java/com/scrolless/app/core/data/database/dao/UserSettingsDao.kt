@@ -178,6 +178,12 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
     @Query("UPDATE user_settings SET instagram_feed_blocking_enabled = :enabled WHERE id = 1")
     abstract suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
 
+    @Query("SELECT inspector_overlay_enabled FROM user_settings WHERE id = 1")
+    abstract fun getInspectorOverlayEnabled(): Flow<Boolean>
+
+    @Query("UPDATE user_settings SET inspector_overlay_enabled = :enabled WHERE id = 1")
+    abstract suspend fun setInspectorOverlayEnabled(enabled: Boolean)
+
     @Query("SELECT strict_until_at FROM user_settings WHERE id = 1")
     abstract fun getStrictUntil(): Flow<Long>
 

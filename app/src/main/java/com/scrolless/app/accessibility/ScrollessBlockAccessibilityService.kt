@@ -277,8 +277,18 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Start with restricted configuration to save battery
         refreshServiceConfig()
 
+        // The inspector is how detection rules get written, but it sits on top of every
+        // app, so it stays behind a switch in the debug panel instead of always showing.
         if (BuildConfig.DEBUG) {
-            inspectorOverlayManager.show(this)
+            serviceScope.launch {
+                userSettingsStore.getInspectorOverlayEnabled().distinctUntilChanged().collect { enabled ->
+                    if (enabled) {
+                        inspectorOverlayManager.show(this@ScrollessBlockAccessibilityService)
+                    } else {
+                        inspectorOverlayManager.cleanup()
+                    }
+                }
+            }
         }
 
         // Check if we need to bring the app to foreground

@@ -73,6 +73,7 @@ object DataDiModule {
                 ScrollessDatabase.MIGRATION_9_10,
                 ScrollessDatabase.MIGRATION_10_11,
                 ScrollessDatabase.MIGRATION_11_12,
+                ScrollessDatabase.MIGRATION_12_13,
             ).fallbackToDestructiveMigration(true) // Not recommended but for now it shouldn't matter
             .fallbackToDestructiveMigrationOnDowngrade(true).addCallback(
                 object : RoomDatabase.Callback() {
@@ -94,10 +95,10 @@ object DataDiModule {
                                                    partner_quota_anchor_elapsed, partner_quota_anchor_boot,
                                                    strict_until_at, strict_anchor_wall,
                                                    strict_anchor_elapsed, strict_anchor_boot,
-                                                   instagram_feed_blocking_enabled)
+                                                   instagram_feed_blocking_enabled, inspector_overlay_enabled)
                         VALUES (1, 'NothingSelected', 0, 0, 0, 0, 0, 0, 100, 0, 0, 0,
                                 CAST(strftime('%s','now') AS INTEGER) * 1000, 0, 0, 0, 300000, 0,
-                                '', 0, 0, 0, 0, -1, 0, 0, 0, -1, 0)
+                                '', 0, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0)
                         """,
                         )
                     }

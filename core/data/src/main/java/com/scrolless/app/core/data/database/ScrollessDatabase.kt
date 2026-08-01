@@ -37,7 +37,7 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
         SessionSegmentEntity::class,
         RedeemedGiftEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -288,6 +288,12 @@ abstract class ScrollessDatabase : RoomDatabase() {
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_settings ADD COLUMN instagram_feed_blocking_enabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+        // Visibility of the debug-only accessibility inspector overlay.
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN inspector_overlay_enabled INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

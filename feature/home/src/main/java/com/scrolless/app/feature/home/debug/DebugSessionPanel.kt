@@ -115,6 +115,8 @@ internal fun FloatingDebugUsagePanel(
     onUsageChanged: (List<SessionSegment>) -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
+    inspectorOverlayEnabled: Boolean = false,
+    onToggleInspectorOverlay: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     val paddingPx = with(density) { 16.dp.roundToPx() }
@@ -187,6 +189,8 @@ internal fun FloatingDebugUsagePanel(
                     selectedDate = selectedDate,
                     onUsageChanged = onUsageChanged,
                     onReset = onReset,
+                    inspectorOverlayEnabled = inspectorOverlayEnabled,
+                    onToggleInspectorOverlay = onToggleInspectorOverlay,
                     modifier = Modifier
                         .fillMaxWidth()
                         .alpha(0.98f),
@@ -231,6 +235,8 @@ private fun DebugDayTimelinePanel(
     onUsageChanged: (List<SessionSegment>) -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
+    inspectorOverlayEnabled: Boolean = false,
+    onToggleInspectorOverlay: () -> Unit = {},
 ) {
     val nowMinutes = LocalTime.now().hour * 60 + LocalTime.now().minute
     var newSessionDurationMinutes by remember { mutableIntStateOf(DEFAULT_NEW_SESSION_MINUTES) }
@@ -441,6 +447,28 @@ private fun DebugDayTimelinePanel(
                     onClick = { onReset() },
                 ) {
                     Text(text = "Reset", style = MaterialTheme.typography.labelLarge)
+                }
+
+                TextButton(
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = if (inspectorOverlayEnabled) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        contentColor = if (inspectorOverlayEnabled) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    ),
+                    onClick = { onToggleInspectorOverlay() },
+                ) {
+                    Text(
+                        text = if (inspectorOverlayEnabled) "Inspector ON" else "Inspector OFF",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
                 }
             }
 
