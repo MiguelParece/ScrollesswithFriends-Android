@@ -397,7 +397,6 @@ fun HomeScreen(
             onDebugUsageReset = {
                 viewModel.onDebugResetUsage(uiState.usageAnalytics.selectedDate)
             },
-            onToggleInspectorOverlay = viewModel::onToggleInspectorOverlay,
             onUsageAnalyticsDateSelected = viewModel::onUsageAnalyticsDateSelected,
             onUsageAnalyticsTodaySelected = viewModel::onUsageAnalyticsTodaySelected,
             onAveragePeriodSelected = viewModel::onAveragePeriodSelected,
@@ -553,7 +552,6 @@ private fun HomeContent(
     onPauseToggle: (Boolean) -> Unit,
     onDebugUsageChanged: (List<SessionSegment>) -> Unit = {},
     onDebugUsageReset: () -> Unit = {},
-    onToggleInspectorOverlay: () -> Unit = {},
     onUsageAnalyticsDateSelected: (LocalDate) -> Unit = {},
     onUsageAnalyticsTodaySelected: () -> Unit = {},
     onAveragePeriodSelected: (UsageAveragePeriod) -> Unit = {},
@@ -705,8 +703,6 @@ private fun HomeContent(
                 onReset = {
                     onDebugUsageReset()
                 },
-                inspectorOverlayEnabled = uiState.inspectorOverlayEnabled,
-                onToggleInspectorOverlay = onToggleInspectorOverlay,
                 modifier = Modifier.fillMaxSize(),
             )
         }

@@ -91,10 +91,6 @@ interface UserSettingsStore {
     fun getInstagramFeedBlockingEnabled(): Flow<Boolean>
     suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
 
-    /** Debug-only accessibility inspector overlay; ignored by release builds. */
-    fun getInspectorOverlayEnabled(): Flow<Boolean>
-    suspend fun setInspectorOverlayEnabled(enabled: Boolean)
-
     fun getStrictUntil(): Flow<Long>
     fun getStrictAnchorWall(): Flow<Long>
     fun getStrictAnchorElapsed(): Flow<Long>

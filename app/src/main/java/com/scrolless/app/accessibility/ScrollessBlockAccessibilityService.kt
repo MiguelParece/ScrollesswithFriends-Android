@@ -28,9 +28,7 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
-import com.scrolless.app.BuildConfig
 import com.scrolless.app.R
-import com.scrolless.app.accessibility.debug.InspectorOverlayManager
 import com.scrolless.app.core.blocking.BlockingManager
 import com.scrolless.app.core.blocking.grace.ContentGracePeriodGate
 import com.scrolless.app.core.model.BlockOption
@@ -181,13 +179,6 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     private val appLabel by lazy { getString(R.string.app_name) }
 
-    /**
-     * Debug-only tool for capturing the accessibility tree of other apps, which is how
-     * detection rules get written. Deliberately not in the Hilt graph so it cannot reach
-     * a release build.
-     */
-    private val inspectorOverlayManager by lazy { InspectorOverlayManager() }
-
     /** Whether the Instagram home feed counts as blockable content (opt-in). */
     private var currentInstagramFeedBlockingEnabled: Boolean = false
 
@@ -279,20 +270,6 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         // Start with restricted configuration to save battery
         refreshServiceConfig()
-
-        // The inspector is how detection rules get written, but it sits on top of every
-        // app, so it stays behind a switch in the debug panel instead of always showing.
-        if (BuildConfig.DEBUG) {
-            serviceScope.launch {
-                userSettingsStore.getInspectorOverlayEnabled().distinctUntilChanged().collect { enabled ->
-                    if (enabled) {
-                        inspectorOverlayManager.show(this@ScrollessBlockAccessibilityService)
-                    } else {
-                        inspectorOverlayManager.cleanup()
-                    }
-                }
-            }
-        }
 
         // Check if we need to bring the app to foreground
         serviceScope.launch {
@@ -605,9 +582,6 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         stopPeriodicCheck()
         cancelGraceExpiryRecheck()
         timerOverlayManager.cleanup()
-        if (BuildConfig.DEBUG) {
-            inspectorOverlayManager.cleanup()
-        }
         serviceScope.cancel()
     }
 

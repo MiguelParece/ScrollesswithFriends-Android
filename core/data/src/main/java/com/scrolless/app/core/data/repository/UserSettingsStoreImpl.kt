@@ -62,7 +62,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _partnerQuotaAnchorElapsed = MutableStateFlow(0L)
     private val _partnerQuotaAnchorBoot = MutableStateFlow(-1)
     private val _instagramFeedBlockingEnabled = MutableStateFlow(false)
-    private val _inspectorOverlayEnabled = MutableStateFlow(false)
     private val _strictUntilAt = MutableStateFlow(0L)
     private val _strictAnchorWall = MutableStateFlow(0L)
     private val _strictAnchorElapsed = MutableStateFlow(0L)
@@ -140,9 +139,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getInstagramFeedBlockingEnabled().collect { _instagramFeedBlockingEnabled.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getInspectorOverlayEnabled().collect { _inspectorOverlayEnabled.value = it }
         }
         coroutineScope.launch {
             userSettingsDao.getStrictUntil().collect { _strictUntilAt.value = it }
@@ -332,13 +328,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     override suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean) {
         _instagramFeedBlockingEnabled.value = enabled
         userSettingsDao.setInstagramFeedBlockingEnabled(enabled)
-    }
-
-    override fun getInspectorOverlayEnabled(): Flow<Boolean> = _inspectorOverlayEnabled
-
-    override suspend fun setInspectorOverlayEnabled(enabled: Boolean) {
-        _inspectorOverlayEnabled.value = enabled
-        userSettingsDao.setInspectorOverlayEnabled(enabled)
     }
 
     override fun getStrictUntil(): Flow<Long> = _strictUntilAt

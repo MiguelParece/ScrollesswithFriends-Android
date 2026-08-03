@@ -188,17 +188,14 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    // Grouped because the ui state combine is already at its nine-flow ceiling. Uses the
-    // kotlinx overload directly: the project's own combine has no three-flow arity.
-    private val flagsSnapshot = kotlinx.coroutines.flow.combine(
+    // Grouped because the ui state combine is already at its nine-flow ceiling.
+    private val flagsSnapshot = combine(
         strictModeManager.observeState(),
         _showStrictModeLockedMessage,
-        userSettingsStore.getInspectorOverlayEnabled(),
-    ) { state, showLockedMessage, inspectorOverlayEnabled ->
+    ) { state, showLockedMessage ->
         FlagsSnapshot(
             strictModeArmed = strictModeManager.isArmed(state),
             showStrictModeLockedMessage = showLockedMessage,
-            inspectorOverlayEnabled = inspectorOverlayEnabled,
         )
     }
 
@@ -254,7 +251,6 @@ class HomeViewModel @Inject constructor(
             averagePeriod = averagePeriod,
             strictModeArmed = flags.strictModeArmed,
             showStrictModeLockedMessage = flags.showStrictModeLockedMessage,
-            inspectorOverlayEnabled = flags.inspectorOverlayEnabled,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -471,12 +467,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onToggleInspectorOverlay() {
-        viewModelScope.launch {
-            userSettingsStore.setInspectorOverlayEnabled(!uiState.value.inspectorOverlayEnabled)
-        }
-    }
-
     fun onDebugResetUsage(date: LocalDate) {
         viewModelScope.launch {
             sessionSegmentStore.replaceSessionSegmentsForDate(
@@ -538,9 +528,6 @@ data class HomeUiState(
     /** While armed, settings may only be tightened — see [com.scrolless.app.core.strict.StrictModeGuard]. */
     val strictModeArmed: Boolean = false,
     val showStrictModeLockedMessage: Boolean = false,
-
-    /** Debug builds only: whether the accessibility inspector overlay is showing. */
-    val inspectorOverlayEnabled: Boolean = false,
 )
 
 private fun buildUsageAnalyticsUiState(
@@ -623,11 +610,7 @@ private fun buildUsageAnalyticsDayUiState(date: LocalDate, segments: List<Sessio
     )
 }
 
-private data class FlagsSnapshot(
-    val strictModeArmed: Boolean,
-    val showStrictModeLockedMessage: Boolean,
-    val inspectorOverlayEnabled: Boolean,
-)
+private data class FlagsSnapshot(val strictModeArmed: Boolean, val showStrictModeLockedMessage: Boolean)
 
 private data class UsageSnapshot(
     val blockOption: BlockOption,

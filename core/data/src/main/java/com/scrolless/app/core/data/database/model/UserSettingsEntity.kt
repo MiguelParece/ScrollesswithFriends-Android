@@ -60,5 +60,7 @@ data class UserSettingsEntity(
     @ColumnInfo(name = "strict_anchor_elapsed", defaultValue = "0") val strictAnchorElapsed: Long = 0L,
     @ColumnInfo(name = "strict_anchor_boot", defaultValue = "-1") val strictAnchorBoot: Int = -1,
     @ColumnInfo(name = "instagram_feed_blocking_enabled", defaultValue = "0") val instagramFeedBlockingEnabled: Boolean = false,
+    // Retired with the debug inspector; the column stays because dropping one in SQLite
+    // means rebuilding the table, and Room rejects a database with unmapped columns.
     @ColumnInfo(name = "inspector_overlay_enabled", defaultValue = "0") val inspectorOverlayEnabled: Boolean = false,
 )
