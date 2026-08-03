@@ -26,15 +26,30 @@ package com.scrolless.app.core.blocking.grace
  *
  * Confined to the caller's thread (the accessibility service's main thread); not synchronized.
  */
-class ContentGracePeriodGate(private val budgetMillis: Long, private val elapsedRealtimeMillis: () -> Long) {
+class ContentGracePeriodGate(
+    private val budgetMillis: Long,
+    private val rearmAfterMillis: Long = 0L,
+    private val elapsedRealtimeMillis: () -> Long,
+) {
 
     private var remainingBudgetMillis: Long = budgetMillis
     private var dwellStartedAtMillis: Long? = null
+    private var lastRefillAtMillis: Long? = null
 
-    /** The host app came to the foreground: a new visit earns a fresh budget. */
+    /**
+     * The host app came to the foreground. A visit earns a fresh budget only once per
+     * [rearmAfterMillis]; closing and reopening the app in between carries the leftover
+     * over instead, so relaunching in a loop cannot farm grace.
+     */
     fun onHostAppEntered() {
-        remainingBudgetMillis = budgetMillis
+        val now = elapsedRealtimeMillis()
         dwellStartedAtMillis = null
+
+        val lastRefill = lastRefillAtMillis
+        if (lastRefill != null && (now - lastRefill) < rearmAfterMillis) return
+
+        remainingBudgetMillis = budgetMillis
+        lastRefillAtMillis = now
     }
 
     /** The host app left the foreground: bank whatever dwell was in flight. */

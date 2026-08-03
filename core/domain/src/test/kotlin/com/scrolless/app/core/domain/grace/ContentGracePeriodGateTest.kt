@@ -87,6 +87,36 @@ class ContentGracePeriodGateTest : BaseTest() {
         assertEquals(BUDGET, gate.onContentVisible())
     }
 
+    /** The behaviour that stops "close the app, reopen, get another window" farming. */
+    @Test
+    fun relaunchingWithinTheRearmWindowDoesNotEarnAFreshBudget() {
+        val gate = ContentGracePeriodGate(BUDGET, rearmAfterMillis = 30_000L) { now }
+        gate.onHostAppEntered()
+        gate.onContentVisible()
+        advance(BUDGET + 1)
+        assertEquals(0L, gate.onContentVisible())
+
+        gate.onHostAppExited()
+        advance(1_000L)
+        gate.onHostAppEntered()
+
+        assertEquals(0L, gate.onContentVisible())
+    }
+
+    @Test
+    fun returningAfterTheRearmWindowEarnsAFreshBudget() {
+        val gate = ContentGracePeriodGate(BUDGET, rearmAfterMillis = 30_000L) { now }
+        gate.onHostAppEntered()
+        gate.onContentVisible()
+        advance(BUDGET + 1)
+
+        gate.onHostAppExited()
+        advance(30_000L)
+        gate.onHostAppEntered()
+
+        assertEquals(BUDGET, gate.onContentVisible())
+    }
+
     @Test
     fun contentGoneWithoutDwellIsNoOp() {
         gate.onHostAppEntered()

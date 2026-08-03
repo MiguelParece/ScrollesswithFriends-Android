@@ -187,6 +187,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     private val instagramFeedGrace = ContentGracePeriodGate(
         budgetMillis = INSTAGRAM_FEED_GRACE_MILLIS,
+        rearmAfterMillis = INSTAGRAM_FEED_GRACE_REARM_MILLIS,
         elapsedRealtimeMillis = SystemClock::elapsedRealtime,
     )
 
@@ -1123,8 +1124,14 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         const val INSTAGRAM_PACKAGE = "com.instagram.android"
 
-        /** Time on the feed per Instagram visit that is neither counted nor enforced. */
-        const val INSTAGRAM_FEED_GRACE_MILLIS = 5_000L
+        /**
+         * Time on the feed per Instagram visit that is neither counted nor enforced —
+         * enough to tap through to the inbox, not enough to read a post.
+         */
+        const val INSTAGRAM_FEED_GRACE_MILLIS = 2_000L
+
+        /** A fresh budget is earned at most this often, so relaunching cannot farm grace. */
+        const val INSTAGRAM_FEED_GRACE_REARM_MILLIS = 30_000L
         const val GRACE_RECHECK_SLACK_MILLIS = 100L
     }
 }
