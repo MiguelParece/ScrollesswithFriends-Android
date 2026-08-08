@@ -20,28 +20,39 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import com.scrolless.app.R
 import com.scrolless.app.core.blocking.BlockingManager
 import com.scrolless.app.core.blocking.grace.ContentGracePeriodGate
+import com.scrolless.app.core.blocking.time.TimeProvider
+import com.scrolless.app.core.blocking.time.TrustedWallClock
+import com.scrolless.app.core.minimal.MinimalModeAllowlist
+import com.scrolless.app.core.minimal.MinimalModeSchedule
+import com.scrolless.app.core.minimal.MinimalModeWindow
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.model.BlockableApp
 import com.scrolless.app.core.model.BlockingResult
 import com.scrolless.app.core.model.DetectionMethod
 import com.scrolless.app.core.model.ResolvedBlockableApp
 import com.scrolless.app.core.model.StrictModeState
+import com.scrolless.app.core.repository.MinimalModeStore
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
 import com.scrolless.app.core.strict.StrictModeManager
 import com.scrolless.app.ui.overlay.TimerOverlayManager
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,6 +145,14 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var strictModeManager: StrictModeManager
 
+    /** Which apps survive minimal mode, and the hours during which it applies. */
+    @Inject
+    lateinit var minimalModeStore: MinimalModeStore
+
+    /** Wall clock, elapsed realtime and boot count, so minimal mode can derive a trusted now. */
+    @Inject
+    lateinit var timeProvider: TimeProvider
+
     private val powerManager by lazy { getSystemService(POWER_SERVICE) as PowerManager }
 
     private data class DetectedBlockedContent(val app: ResolvedBlockableApp, val blockingSuppressed: Boolean)
@@ -193,6 +212,35 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     /** Separate from [videoCheckHandler] so stopping periodic checks cannot cancel grace re-checks. */
     private val graceCheckHandler = Handler(Looper.getMainLooper())
+
+    /** Master switch for minimal mode; the schedule below only applies while this is on. */
+    private var currentMinimalModeEnabled: Boolean = false
+
+    private var currentMinimalModeWindows: List<MinimalModeWindow> = emptyList()
+
+    private var currentMinimalModeAllowedApps: Set<String> = emptySet()
+
+    /** Whether a minimal-mode window is open right now, recomputed on edges and on events. */
+    private var minimalModeWindowOpen: Boolean = false
+
+    /**
+     * Every package answering the home intent. Empty means the launcher could not be
+     * resolved, which disables minimal mode rather than risk kicking the home screen.
+     */
+    private var launcherPackageIds: Set<String> = emptySet()
+
+    /** Current keyboard, so typing in an allowed app is not read as opening a blocked one. */
+    private var imePackageId: String? = null
+
+    private var minimalAnchorWall: Long = 0L
+    private var minimalAnchorElapsed: Long = 0L
+    private var minimalAnchorBoot: Int = -1
+
+    private var lastMinimalKickElapsed: Long = 0L
+    private var lastMinimalToastElapsed: Long = 0L
+
+    /** Separate handler again: window edges must not be cancelled with the other schedules. */
+    private val minimalModeHandler = Handler(Looper.getMainLooper())
 
     private fun isPauseActive(now: Long = System.currentTimeMillis()): Boolean = pauseUntilMillis > now
 
@@ -318,6 +366,41 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             userSettingsStore.getInstagramFeedBlockingEnabled().collect { currentInstagramFeedBlockingEnabled = it }
         }
 
+        // Minimal mode needs to know the home screen and the keyboard before it can kick
+        // anything, or it would close the very screens the user needs to recover.
+        resolveMinimalModeSystemPackages()
+
+        // Each of these changes what counts as allowed or when, so the window is re-evaluated
+        // and — unlike the other content toggles — the package filter itself is refreshed.
+        serviceScope.launch {
+            userSettingsStore.getMinimalModeEnabled().collect { enabled ->
+                currentMinimalModeEnabled = enabled
+                if (enabled) ensureMinimalModeAnchor()
+                refreshMinimalModeWindow()
+            }
+        }
+        serviceScope.launch {
+            minimalModeStore.getWindows().collect { windows ->
+                currentMinimalModeWindows = windows
+                refreshMinimalModeWindow()
+            }
+        }
+        serviceScope.launch {
+            minimalModeStore.getAllowedApps().collect { currentMinimalModeAllowedApps = it }
+        }
+        serviceScope.launch {
+            userSettingsStore.getMinimalAnchorWall().collect {
+                minimalAnchorWall = it
+                refreshMinimalModeWindow()
+            }
+        }
+        serviceScope.launch {
+            userSettingsStore.getMinimalAnchorElapsed().collect { minimalAnchorElapsed = it }
+        }
+        serviceScope.launch {
+            userSettingsStore.getMinimalAnchorBoot().collect { minimalAnchorBoot = it }
+        }
+
         // Observe strict mode state: keep the guard's snapshot fresh, re-anchor after
         // reboots, and widen/narrow the package filter when the lock arms or expires.
         serviceScope.launch {
@@ -438,8 +521,22 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         updateForegroundAppState(userActiveApp)
 
         // While strict mode is armed, screens that could disable Scrolless are closed.
+        // Checked first: this is the anti-tamper path and keeps absolute priority.
         if (packageId in STRICT_GUARD_PACKAGES && strictModeManager.isArmed(strictModeState)) {
             handleStrictGuardEvent()
+            return
+        }
+
+        // A scheduled edge can be missed while the device sleeps, so every event is also a
+        // chance to notice the window opened or closed.
+        if (currentMinimalModeEnabled && isMinimalModeWindowOpenNow() != minimalModeWindowOpen) {
+            refreshMinimalModeWindow()
+        }
+
+        // Minimal mode closes anything outside the allowlist. It sits above the early return
+        // below because an arbitrary app is not a BlockableApp, so nothing past this point
+        // would ever see it.
+        if (minimalModeWindowOpen && !minimalModeAllows(packageId) && handleMinimalModeEvent(packageId)) {
             return
         }
 
@@ -582,6 +679,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         )
         stopPeriodicCheck()
         cancelGraceExpiryRecheck()
+        minimalModeHandler.removeCallbacks(minimalModeTransitionRunnable)
         timerOverlayManager.cleanup()
         serviceScope.cancel()
     }
@@ -882,7 +980,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         val info = serviceInfo ?: return
         val strictArmed = strictModeManager.isArmed(strictModeState)
 
-        if (listenToAll) {
+        if (listenToAll || minimalModeWindowOpen) {
+            // Minimal mode has to see apps it has never heard of, so the filter comes off for
+            // as long as a window is open — and goes straight back on when it closes.
             info.packageNames = null // Listen to all
             Timber.d("Expanded service configuration to listen to all packages")
 
@@ -899,6 +999,16 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
             }.distinct().toTypedArray()
             Timber.d("Restricted service configuration to target packages only")
         }
+        // Watching every package for content changes means waking on every keystroke in every
+        // app, which is the whole battery cost of minimal mode. Classifying the foreground app
+        // only needs window transitions, so content events are dropped while a window is open
+        // and nothing is being tracked.
+        info.eventTypes = if (minimalModeWindowOpen && !listenToAll) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        } else {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+        }
+
         // Coalescing events costs battery but also reaction time; while the lock is armed a
         // guarded dialog must be caught before the user can tap through it.
         info.notificationTimeout = if (strictArmed) 0L else DEFAULT_NOTIFICATION_TIMEOUT_MILLIS
@@ -951,6 +1061,180 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // brain-rot session cleanly.
         if (isProcessingBlockedContent) {
             validateTrackedAppState("strict guard")
+        }
+    }
+
+    /**
+     * Finds the packages minimal mode must never close: the home screen and the keyboard.
+     *
+     * Every home candidate is kept, not just the default one — with two launchers and no
+     * default the home intent opens the system chooser, and a single package id would leave
+     * the other launcher exposed to a kick loop. An empty result disables the feature; a
+     * phone that cannot reach its own home screen is a far worse outcome than an unenforced
+     * schedule.
+     */
+    private fun resolveMinimalModeSystemPackages() {
+        launcherPackageIds = try {
+            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            packageManager.queryIntentActivities(home, PackageManager.MATCH_DEFAULT_ONLY)
+                .mapNotNullTo(mutableSetOf()) { it.activityInfo?.packageName }
+        } catch (e: Exception) {
+            Timber.e(e, "Minimal mode: could not resolve the home screen, staying inert")
+            emptySet()
+        }
+
+        imePackageId = try {
+            Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+                ?.substringBefore('/')
+                ?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Timber.w(e, "Minimal mode: could not resolve the current keyboard")
+            null
+        }
+    }
+
+    /**
+     * Writes the clock anchor minimal mode derives the real time from.
+     *
+     * Only on the first run and after a reboot. The stored wall clock never moves backwards,
+     * so rebooting with the clock wound back cannot buy an earlier anchor.
+     */
+    private suspend fun ensureMinimalModeAnchor() {
+        // Whether the anchor actually moves is decided in SQL: the cached fields here are
+        // still empty while their Room flows are in flight, so testing them would re-anchor
+        // on every service start and quietly reduce the derived clock to the system one.
+        userSettingsStore.anchorMinimalModeIfNeeded(
+            anchorWallMillis = timeProvider.currentTimeInMillis(),
+            anchorElapsedMillis = timeProvider.elapsedRealtimeMillis(),
+            anchorBootCount = timeProvider.bootCount(),
+        )
+    }
+
+    private fun trustedNowMillis(): Long = TrustedWallClock.nowMillis(
+        anchorWallMillis = minimalAnchorWall,
+        anchorElapsedMillis = minimalAnchorElapsed,
+        anchorBootCount = minimalAnchorBoot,
+        wallMillis = timeProvider.currentTimeInMillis(),
+        elapsedMillis = timeProvider.elapsedRealtimeMillis(),
+        bootCount = timeProvider.bootCount(),
+    )
+
+    private fun minuteOfDay(epochMillis: Long): Int {
+        val localTime = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalTime()
+        return localTime.hour * 60 + localTime.minute
+    }
+
+    private fun isMinimalModeWindowOpenNow(): Boolean = when {
+        !currentMinimalModeEnabled -> false
+
+        currentMinimalModeWindows.isEmpty() -> false
+
+        // Fail open rather than into a phone that cannot reach its home screen.
+        launcherPackageIds.isEmpty() -> false
+
+        else -> MinimalModeSchedule.isOpen(currentMinimalModeWindows, minuteOfDay(trustedNowMillis()))
+    }
+
+    private fun minimalModeAllows(packageId: String): Boolean = MinimalModeAllowlist.allows(
+        packageId = packageId,
+        userAllowed = currentMinimalModeAllowedApps,
+        launcherPackageIds = launcherPackageIds,
+        imePackageId = imePackageId,
+        ownPackageId = packageName,
+    )
+
+    /**
+     * Recomputes whether a window is open and re-arms the edge alarm.
+     *
+     * Widening the package filter is what makes the guard able to see apps it has never heard
+     * of, so a change has to reach [refreshServiceConfig].
+     */
+    private fun refreshMinimalModeWindow() {
+        val open = isMinimalModeWindowOpenNow()
+        val changed = open != minimalModeWindowOpen
+        minimalModeWindowOpen = open
+        scheduleMinimalModeTransition()
+        if (!changed) return
+
+        Timber.i("Minimal mode window %s", if (open) "opened" else "closed")
+        refreshServiceConfig()
+
+        // A window opening while an app is already on screen produces no event of its own,
+        // so the foreground has to be checked directly or the app would survive the edge.
+        if (open) {
+            resolveMinimalModeSystemPackages()
+            enforceMinimalModeOnForeground()
+        }
+    }
+
+    private val minimalModeTransitionRunnable = Runnable { refreshMinimalModeWindow() }
+
+    /**
+     * Wakes the service at the next window edge.
+     *
+     * Accessibility events only arrive when the user acts, and outside a window the package
+     * filter is narrow, so without this the service would not learn a window had opened until
+     * the user happened to launch one of the few watched apps. Uses the same delayed-handler
+     * pattern as the grace re-check rather than an alarm; a handler dropped during doze is
+     * corrected by the per-event check in [onAccessibilityEvent].
+     */
+    private fun scheduleMinimalModeTransition() {
+        minimalModeHandler.removeCallbacks(minimalModeTransitionRunnable)
+        if (!currentMinimalModeEnabled || currentMinimalModeWindows.isEmpty()) return
+
+        val now = trustedNowMillis()
+        val untilBoundary = MinimalModeSchedule.millisUntilNextTransition(currentMinimalModeWindows, minuteOfDay(now))
+        // The schedule is minute-granular and measures from the start of the current minute.
+        val intoMinute = now % MinimalModeSchedule.MILLIS_PER_MINUTE
+        val delay = (untilBoundary - intoMinute + MINIMAL_TRANSITION_SLACK_MILLIS)
+            .coerceAtLeast(MINIMAL_TRANSITION_MIN_DELAY_MILLIS)
+        minimalModeHandler.postDelayed(minimalModeTransitionRunnable, delay)
+    }
+
+    private fun enforceMinimalModeOnForeground() {
+        val activePackage = rootInActiveWindow?.packageName?.toString() ?: return
+        if (minimalModeAllows(activePackage)) return
+        kickFromMinimalMode(activePackage)
+    }
+
+    /**
+     * @return true when the event was handled and the rest of the pipeline should be skipped.
+     */
+    private fun handleMinimalModeEvent(packageId: String): Boolean {
+        // Keyboards, toasts and system dialogs raise events for their own package while
+        // another app owns the screen. Acting on those would close the allowed app underneath.
+        val activePackage = rootInActiveWindow?.packageName?.toString()
+        if (activePackage != null && activePackage != packageId) return false
+
+        kickFromMinimalMode(packageId)
+
+        // This path returns before normal exit detection; close a lingering session cleanly.
+        if (isProcessingBlockedContent) {
+            validateTrackedAppState("minimal mode")
+        }
+        return true
+    }
+
+    /**
+     * Leaves a disallowed app with HOME.
+     *
+     * No escalation to [bringAppToForeground], unlike the strict guard: that exists to break a
+     * spam-tap loop on an uninstall dialog, whereas here HOME already removes the app and
+     * pulling Scrolless forward would only fight the launcher.
+     */
+    private fun kickFromMinimalMode(packageId: String) {
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (nowElapsed - lastMinimalKickElapsed < MINIMAL_KICK_MIN_INTERVAL_MILLIS) return
+        lastMinimalKickElapsed = nowElapsed
+
+        Timber.i("Minimal mode: %s is not on the allowlist, leaving to home", packageId)
+        mainHandler.post { performGlobalAction(GLOBAL_ACTION_HOME) }
+
+        if (nowElapsed - lastMinimalToastElapsed >= MINIMAL_TOAST_INTERVAL_MILLIS) {
+            lastMinimalToastElapsed = nowElapsed
+            mainHandler.post {
+                Toast.makeText(this, R.string.minimal_mode_active_toast, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -1133,5 +1417,19 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         /** A fresh budget is earned at most this often, so relaunching cannot farm grace. */
         const val INSTAGRAM_FEED_GRACE_REARM_MILLIS = 30_000L
         const val GRACE_RECHECK_SLACK_MILLIS = 100L
+
+        /**
+         * Longer than [STRICT_KICK_MIN_INTERVAL_MILLIS]: the strict guard races a finger on a
+         * destructive button, this one only has to outlast the trailing events an app emits
+         * on its way out after HOME.
+         */
+        const val MINIMAL_KICK_MIN_INTERVAL_MILLIS = 500L
+        const val MINIMAL_TOAST_INTERVAL_MILLIS = 3_000L
+
+        /** Land just after the boundary rather than a hair before it. */
+        const val MINIMAL_TRANSITION_SLACK_MILLIS = 250L
+
+        /** Floor on the edge alarm so a rounding error cannot spin the handler. */
+        const val MINIMAL_TRANSITION_MIN_DELAY_MILLIS = 1_000L
     }
 }

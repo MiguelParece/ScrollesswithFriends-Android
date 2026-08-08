@@ -37,13 +37,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.scrolless.app.core.blocking.time.TimeProvider
 import com.scrolless.app.core.data.database.ScrollessDatabase
 import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
+import com.scrolless.app.core.data.database.dao.MinimalModeAllowedAppDao
+import com.scrolless.app.core.data.database.dao.MinimalModeWindowDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
 import com.scrolless.app.core.data.repository.AndroidTimeProvider
+import com.scrolless.app.core.data.repository.MinimalModeStoreImpl
+import com.scrolless.app.core.data.repository.PackageManagerInstalledAppsProvider
 import com.scrolless.app.core.data.repository.RedeemedGiftStoreImpl
 import com.scrolless.app.core.data.repository.SessionSegmentStoreImpl
 import com.scrolless.app.core.data.repository.SessionTrackerImpl
 import com.scrolless.app.core.data.repository.UserSettingsStoreImpl
+import com.scrolless.app.core.repository.InstalledAppsProvider
+import com.scrolless.app.core.repository.MinimalModeStore
 import com.scrolless.app.core.repository.RedeemedGiftStore
 import com.scrolless.app.core.repository.SessionSegmentStore
 import com.scrolless.app.core.repository.SessionTracker
@@ -74,6 +80,7 @@ object DataDiModule {
                 ScrollessDatabase.MIGRATION_10_11,
                 ScrollessDatabase.MIGRATION_11_12,
                 ScrollessDatabase.MIGRATION_12_13,
+                ScrollessDatabase.MIGRATION_13_14,
             ).fallbackToDestructiveMigration(true) // Not recommended but for now it shouldn't matter
             .fallbackToDestructiveMigrationOnDowngrade(true).addCallback(
                 object : RoomDatabase.Callback() {
@@ -95,10 +102,13 @@ object DataDiModule {
                                                    partner_quota_anchor_elapsed, partner_quota_anchor_boot,
                                                    strict_until_at, strict_anchor_wall,
                                                    strict_anchor_elapsed, strict_anchor_boot,
-                                                   instagram_feed_blocking_enabled, inspector_overlay_enabled)
+                                                   instagram_feed_blocking_enabled, inspector_overlay_enabled,
+                                                   minimal_mode_enabled, minimal_anchor_wall,
+                                                   minimal_anchor_elapsed, minimal_anchor_boot)
                         VALUES (1, 'NothingSelected', 0, 0, 0, 0, 0, 0, 100, 0, 0, 0,
                                 CAST(strftime('%s','now') AS INTEGER) * 1000, 0, 0, 0, 300000, 0,
-                                '', 0, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0)
+                                '', 0, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0,
+                                0, 0, 0, -1)
                         """,
                         )
                     }
@@ -126,6 +136,27 @@ object DataDiModule {
     @Singleton
     fun provideRedeemedGiftStore(redeemedGiftDao: RedeemedGiftDao): RedeemedGiftStore =
         RedeemedGiftStoreImpl(redeemedGiftDao = redeemedGiftDao)
+
+    @Provides
+    @Singleton
+    fun provideMinimalModeAllowedAppDao(database: ScrollessDatabase): MinimalModeAllowedAppDao =
+        database.minimalModeAllowedAppDao()
+
+    @Provides
+    @Singleton
+    fun provideMinimalModeWindowDao(database: ScrollessDatabase): MinimalModeWindowDao = database.minimalModeWindowDao()
+
+    @Provides
+    @Singleton
+    fun provideMinimalModeStore(
+        allowedAppDao: MinimalModeAllowedAppDao,
+        windowDao: MinimalModeWindowDao,
+    ): MinimalModeStore = MinimalModeStoreImpl(allowedAppDao = allowedAppDao, windowDao = windowDao)
+
+    @Provides
+    @Singleton
+    fun provideInstalledAppsProvider(@ApplicationContext context: Context): InstalledAppsProvider =
+        PackageManagerInstalledAppsProvider(context = context)
 
     @Provides
     @Singleton

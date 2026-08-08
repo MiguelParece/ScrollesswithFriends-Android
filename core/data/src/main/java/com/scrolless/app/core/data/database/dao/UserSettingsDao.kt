@@ -178,6 +178,44 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
     @Query("UPDATE user_settings SET instagram_feed_blocking_enabled = :enabled WHERE id = 1")
     abstract suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
 
+    @Query("SELECT minimal_mode_enabled FROM user_settings WHERE id = 1")
+    abstract fun getMinimalModeEnabled(): Flow<Boolean>
+
+    @Query("UPDATE user_settings SET minimal_mode_enabled = :enabled WHERE id = 1")
+    abstract suspend fun setMinimalModeEnabled(enabled: Boolean)
+
+    @Query("SELECT minimal_anchor_wall FROM user_settings WHERE id = 1")
+    abstract fun getMinimalAnchorWall(): Flow<Long>
+
+    @Query("SELECT minimal_anchor_elapsed FROM user_settings WHERE id = 1")
+    abstract fun getMinimalAnchorElapsed(): Flow<Long>
+
+    @Query("SELECT minimal_anchor_boot FROM user_settings WHERE id = 1")
+    abstract fun getMinimalAnchorBoot(): Flow<Int>
+
+    /**
+     * Takes the minimal-mode clock anchor, but only when there isn't one yet or the device has
+     * rebooted since the last one.
+     *
+     * The condition lives in SQL on purpose. Deciding in Kotlin would mean reading the cached
+     * anchor first, and at service start those caches are still zero while their Room flows
+     * are in flight — so every launch would re-anchor to the current clock and the derived
+     * time would collapse back into the system clock, silently doing nothing.
+     *
+     * `MAX` keeps the stored wall clock from ever moving backwards, so rebooting with the
+     * clock wound back cannot buy an earlier anchor.
+     */
+    @Query(
+        """
+        UPDATE user_settings SET
+            minimal_anchor_wall = MAX(minimal_anchor_wall, :anchorWallMillis),
+            minimal_anchor_elapsed = :anchorElapsedMillis,
+            minimal_anchor_boot = :anchorBootCount
+        WHERE id = 1 AND (minimal_anchor_wall <= 0 OR minimal_anchor_boot <> :anchorBootCount)
+        """,
+    )
+    abstract suspend fun anchorMinimalModeIfNeeded(anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int)
+
     @Query("SELECT strict_until_at FROM user_settings WHERE id = 1")
     abstract fun getStrictUntil(): Flow<Long>
 

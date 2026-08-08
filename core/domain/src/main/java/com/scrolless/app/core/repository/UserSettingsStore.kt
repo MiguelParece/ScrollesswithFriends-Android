@@ -96,6 +96,15 @@ interface UserSettingsStore {
     fun getStrictAnchorElapsed(): Flow<Long>
     fun getStrictAnchorBoot(): Flow<Int>
     suspend fun updateStrictModeState(strictUntilAt: Long, anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int)
+
+    fun getMinimalModeEnabled(): Flow<Boolean>
+    suspend fun setMinimalModeEnabled(enabled: Boolean)
+
+    fun getMinimalAnchorWall(): Flow<Long>
+    fun getMinimalAnchorElapsed(): Flow<Long>
+    fun getMinimalAnchorBoot(): Flow<Int>
+    /** No-op unless the anchor is unset or the device rebooted; the check is done in SQL. */
+    suspend fun anchorMinimalModeIfNeeded(anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int)
 }
 
 suspend fun UserSettingsStore.setTimerOverlayPosition(positionX: Int, positionY: Int) {

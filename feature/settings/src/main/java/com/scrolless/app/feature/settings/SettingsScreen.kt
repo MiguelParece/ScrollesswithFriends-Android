@@ -82,6 +82,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit,
+    onNavigateToMinimalMode: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
     giftViewModel: GiftViewModel = hiltViewModel(),
 ) {
@@ -95,6 +96,7 @@ fun SettingsScreen(
         onExceptReelsSentByDmChange = viewModel::onExceptReelsSentByDmChange,
         onTimerOverlayEnabledChange = viewModel::onTimerOverlayEnabledChange,
         onNavigateBack = onNavigateBack,
+        onNavigateToMinimalMode = onNavigateToMinimalMode,
         onSendGiftClick = giftViewModel::onCreateGift,
         onArmStrictMode = viewModel::onArmStrictMode,
         onInstagramFeedBlockingEnabledChange = viewModel::onInstagramFeedBlockingEnabledChange,
@@ -117,6 +119,7 @@ private fun SettingsScreenContent(
     onExceptReelsSentByDmChange: (Boolean) -> Unit,
     onTimerOverlayEnabledChange: (Boolean) -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToMinimalMode: () -> Unit = {},
     onSendGiftClick: () -> Unit = {},
     onArmStrictMode: (Long) -> Unit = {},
     onInstagramFeedBlockingEnabledChange: (Boolean) -> Unit = {},
@@ -216,6 +219,18 @@ private fun SettingsScreenContent(
                 TimerOverlayItem(
                     checked = uiState.timerOverlayEnabled,
                     onCheckedChange = onTimerOverlayEnabledChange,
+                )
+
+                SettingsDivider()
+
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_minimal_mode_title),
+                    description = if (uiState.minimalModeEnabled) {
+                        stringResource(R.string.settings_minimal_mode_description_on)
+                    } else {
+                        stringResource(R.string.settings_minimal_mode_description_off)
+                    },
+                    onClick = onNavigateToMinimalMode,
                 )
             }
 

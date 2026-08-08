@@ -59,6 +59,44 @@
 
     <string name="settings_block_instagram_feed_description">Limit time on the Instagram home feed too, using the same allowance as Reels. Profile, posts, search and DMs stay open.</string>
 
+    <string name="settings_minimal_mode_title">Minimal mode</string>
+
+    <string name="settings_minimal_mode_description_off">Off — reduce the phone to a few apps during chosen hours</string>
+
+    <string name="settings_minimal_mode_description_on">On — only your allowlist opens during the scheduled hours</string>
+
+    <string name="minimal_mode_title">Minimal mode</string>
+
+    <string name="minimal_mode_enable_title">Reduce the phone</string>
+
+    <string name="minimal_mode_enable_description">During the hours below, anything outside your allowlist closes itself. Calls, alarms, the home screen and the keyboard always stay available.</string>
+
+    <string name="minimal_mode_schedule_section">Hours</string>
+
+    <string name="minimal_mode_no_windows">No hours set, so nothing is blocked yet.</string>
+
+    <string name="minimal_mode_add_window">Add hours</string>
+
+    <string name="minimal_mode_remove_window">Remove</string>
+
+    <string name="minimal_mode_window_range">%1$s to %2$s</string>
+
+    <string name="minimal_mode_window_overnight">Runs overnight</string>
+
+    <string name="minimal_mode_pick_start">Start at</string>
+
+    <string name="minimal_mode_pick_end">End at</string>
+
+    <string name="minimal_mode_next">Next</string>
+
+    <string name="minimal_mode_save_window">Save</string>
+
+    <string name="minimal_mode_apps_section">Allowed apps</string>
+
+    <string name="minimal_mode_apps_description">Everything unticked closes during those hours. Settings is not allowed by default — tick it here if you want it reachable.</string>
+
+    <string name="minimal_mode_loading_apps">Reading the installed apps…</string>
+
     <string name="settings_section_strict_mode">Strict mode</string>
 
     <string name="settings_strict_title">Time lock</string>

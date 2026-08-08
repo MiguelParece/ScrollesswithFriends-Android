@@ -24,6 +24,20 @@
         android:name="android.permission.INTERNET"
         tools:node="remove" />
 
+    <!-- Package visibility for the minimal-mode app picker: launcher entries only.
+         Deliberately not QUERY_ALL_PACKAGES — the picker needs the apps a user can open,
+         not an inventory of everything installed. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application
         android:name=".ScrollessApplication"
         android:allowBackup="false"

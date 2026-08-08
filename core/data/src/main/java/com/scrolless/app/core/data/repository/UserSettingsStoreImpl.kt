@@ -66,6 +66,10 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _strictAnchorWall = MutableStateFlow(0L)
     private val _strictAnchorElapsed = MutableStateFlow(0L)
     private val _strictAnchorBoot = MutableStateFlow(-1)
+    private val _minimalModeEnabled = MutableStateFlow(false)
+    private val _minimalAnchorWall = MutableStateFlow(0L)
+    private val _minimalAnchorElapsed = MutableStateFlow(0L)
+    private val _minimalAnchorBoot = MutableStateFlow(-1)
 
     init {
         coroutineScope.launch {
@@ -151,6 +155,18 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getStrictAnchorBoot().collect { _strictAnchorBoot.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getMinimalModeEnabled().collect { _minimalModeEnabled.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getMinimalAnchorWall().collect { _minimalAnchorWall.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getMinimalAnchorElapsed().collect { _minimalAnchorElapsed.value = it }
+        }
+        coroutineScope.launch {
+            userSettingsDao.getMinimalAnchorBoot().collect { _minimalAnchorBoot.value = it }
         }
     }
 
@@ -350,6 +366,29 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         _strictAnchorBoot.value = anchorBootCount
         userSettingsDao.updateStrictModeState(
             strictUntilAt = strictUntilAt,
+            anchorWallMillis = anchorWallMillis,
+            anchorElapsedMillis = anchorElapsedMillis,
+            anchorBootCount = anchorBootCount,
+        )
+    }
+
+    override fun getMinimalModeEnabled(): Flow<Boolean> = _minimalModeEnabled
+
+    override suspend fun setMinimalModeEnabled(enabled: Boolean) {
+        _minimalModeEnabled.value = enabled
+        userSettingsDao.setMinimalModeEnabled(enabled)
+    }
+
+    override fun getMinimalAnchorWall(): Flow<Long> = _minimalAnchorWall
+
+    override fun getMinimalAnchorElapsed(): Flow<Long> = _minimalAnchorElapsed
+
+    override fun getMinimalAnchorBoot(): Flow<Int> = _minimalAnchorBoot
+
+    override suspend fun anchorMinimalModeIfNeeded(anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int) {
+        // No cache write: the DB decides whether the anchor moves, and the init collectors
+        // above mirror the result back. Pre-empting it here would defeat the whole point.
+        userSettingsDao.anchorMinimalModeIfNeeded(
             anchorWallMillis = anchorWallMillis,
             anchorElapsedMillis = anchorElapsedMillis,
             anchorBootCount = anchorBootCount,

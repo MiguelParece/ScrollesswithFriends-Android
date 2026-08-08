@@ -42,13 +42,20 @@ class SettingsViewModel @Inject constructor(
         userSettingsStore.getExceptReelsSentByDm(),
         userSettingsStore.getTimerOverlayEnabled(),
         strictModeManager.observeState(),
-        userSettingsStore.getInstagramFeedBlockingEnabled(),
-    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState, instagramFeedBlockingEnabled ->
+        // kotlinx's typed combine stops at five flows, so the two content toggles travel
+        // together rather than pulling a flow helper across the module boundary.
+        combine(
+            userSettingsStore.getInstagramFeedBlockingEnabled(),
+            userSettingsStore.getMinimalModeEnabled(),
+            ::ContentToggles,
+        ),
+    ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState, toggles ->
         SettingsUiState(
             pauseDurationMinutes = (pauseDurationMillis / 60_000L).toInt().coerceIn(1, 60),
             exceptReelsSentByDm = exceptReelsSentByDm,
             timerOverlayEnabled = timerOverlayEnabled,
-            instagramFeedBlockingEnabled = instagramFeedBlockingEnabled,
+            instagramFeedBlockingEnabled = toggles.instagramFeed,
+            minimalModeEnabled = toggles.minimalMode,
             strictModeArmed = strictModeManager.isArmed(strictState),
             strictModeUntilMillis = strictState.untilAtMillis,
             strictModeRemainingMillis = strictModeManager.remainingMillis(strictState),
@@ -99,11 +106,14 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
+private data class ContentToggles(val instagramFeed: Boolean, val minimalMode: Boolean)
+
 data class SettingsUiState(
     val pauseDurationMinutes: Int = 5,
     val exceptReelsSentByDm: Boolean = false,
     val timerOverlayEnabled: Boolean = false,
     val instagramFeedBlockingEnabled: Boolean = false,
+    val minimalModeEnabled: Boolean = false,
     val strictModeArmed: Boolean = false,
     val strictModeUntilMillis: Long = 0L,
     val strictModeRemainingMillis: Long = 0L,
