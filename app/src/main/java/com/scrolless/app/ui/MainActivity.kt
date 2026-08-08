@@ -33,6 +33,7 @@ import com.scrolless.app.designsystem.theme.LocalSharedTransitionScope
 import com.scrolless.app.designsystem.theme.ScrollessTheme
 import com.scrolless.app.feature.home.HomeScreen
 import com.scrolless.app.feature.settings.SettingsScreen
+import com.scrolless.app.feature.settings.minimal.MinimalModeScreen
 import com.scrolless.app.util.requestAppReview
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
@@ -70,6 +71,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 entry<ScrollessRoute.Settings> {
                                     SettingsScreen(
+                                        onNavigateBack = appState::navigateBack,
+                                        onNavigateToMinimalMode = appState::navigateToMinimalMode,
+                                    )
+                                }
+                                entry<ScrollessRoute.MinimalMode> {
+                                    MinimalModeScreen(
                                         onNavigateBack = appState::navigateBack,
                                     )
                                 }

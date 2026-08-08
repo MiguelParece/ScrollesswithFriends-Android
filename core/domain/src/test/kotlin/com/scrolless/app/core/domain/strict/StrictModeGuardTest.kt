@@ -17,6 +17,7 @@
 package com.scrolless.app.core.domain.strict
 
 import com.scrolless.app.core.domain.BaseTest
+import com.scrolless.app.core.minimal.MinimalModeWindow
 import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.strict.StrictModeGuard
 import org.junit.Assert.assertFalse
@@ -137,6 +138,31 @@ class StrictModeGuardTest : BaseTest() {
 
         assertFalse(StrictModeGuard.canChangeInstagramFeedBlocking(armed = true, next = false))
         assertTrue(StrictModeGuard.canChangeInstagramFeedBlocking(armed = true, next = true))
+    }
+
+    @Test
+    fun armed_minimalModeCanOnlyBeSwitchedOn() {
+        assertFalse(StrictModeGuard.canChangeMinimalModeEnabled(armed = true, next = false))
+        assertTrue(StrictModeGuard.canChangeMinimalModeEnabled(armed = true, next = true))
+        assertTrue(StrictModeGuard.canChangeMinimalModeEnabled(armed = false, next = false))
+    }
+
+    @Test
+    fun armed_allowingOneMoreAppIsRefusedButRemovingIsNot() {
+        assertFalse(StrictModeGuard.canAddAllowedApp(armed = true))
+        assertTrue(StrictModeGuard.canAddAllowedApp(armed = false))
+    }
+
+    @Test
+    fun armed_minimalModeScheduleMayGrowButNotShrink() {
+        val current = listOf(MinimalModeWindow(startMinuteOfDay = 22 * 60, endMinuteOfDay = 8 * 60))
+        val wider = listOf(MinimalModeWindow(startMinuteOfDay = 21 * 60, endMinuteOfDay = 9 * 60))
+        val narrower = listOf(MinimalModeWindow(startMinuteOfDay = 23 * 60, endMinuteOfDay = 7 * 60))
+
+        assertTrue(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = wider))
+        assertFalse(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = narrower))
+        assertFalse(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = emptyList()))
+        assertTrue(StrictModeGuard.canChangeMinimalModeSchedule(armed = false, current = current, next = emptyList()))
     }
 
     @Test

@@ -48,6 +48,9 @@ sealed interface ScrollessRoute : NavKey {
 
     @Serializable
     data object Settings : ScrollessRoute
+
+    @Serializable
+    data object MinimalMode : ScrollessRoute
 }
 
 @Composable
@@ -60,6 +63,12 @@ class ScrollessAppState(val backStack: NavBackStack<NavKey>) {
     fun navigateToSettings() {
         if (backStack.lastOrNull() != ScrollessRoute.Settings) {
             backStack.add(ScrollessRoute.Settings)
+        }
+    }
+
+    fun navigateToMinimalMode() {
+        if (backStack.lastOrNull() != ScrollessRoute.MinimalMode) {
+            backStack.add(ScrollessRoute.MinimalMode)
         }
     }
 

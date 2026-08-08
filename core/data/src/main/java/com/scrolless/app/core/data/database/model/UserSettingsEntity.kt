@@ -63,4 +63,10 @@ data class UserSettingsEntity(
     // Retired with the debug inspector; the column stays because dropping one in SQLite
     // means rebuilding the table, and Room rejects a database with unmapped columns.
     @ColumnInfo(name = "inspector_overlay_enabled", defaultValue = "0") val inspectorOverlayEnabled: Boolean = false,
+    @ColumnInfo(name = "minimal_mode_enabled", defaultValue = "0") val minimalModeEnabled: Boolean = false,
+    // Third copy of the wall/elapsed/boot anchor triple, after partner quota and strict mode.
+    // Folding them into one shared anchor is the right refactor and is not this change.
+    @ColumnInfo(name = "minimal_anchor_wall", defaultValue = "0") val minimalAnchorWall: Long = 0L,
+    @ColumnInfo(name = "minimal_anchor_elapsed", defaultValue = "0") val minimalAnchorElapsed: Long = 0L,
+    @ColumnInfo(name = "minimal_anchor_boot", defaultValue = "-1") val minimalAnchorBoot: Int = -1,
 )

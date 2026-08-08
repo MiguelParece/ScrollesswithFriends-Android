@@ -21,9 +21,13 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.scrolless.app.core.data.database.dao.MinimalModeAllowedAppDao
+import com.scrolless.app.core.data.database.dao.MinimalModeWindowDao
 import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
+import com.scrolless.app.core.data.database.model.MinimalModeAllowedAppEntity
+import com.scrolless.app.core.data.database.model.MinimalModeWindowEntity
 import com.scrolless.app.core.data.database.model.RedeemedGiftEntity
 import com.scrolless.app.core.data.database.model.SessionSegmentEntity
 import com.scrolless.app.core.data.database.model.UserSettingsEntity
@@ -36,8 +40,10 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
         UserSettingsEntity::class,
         SessionSegmentEntity::class,
         RedeemedGiftEntity::class,
+        MinimalModeAllowedAppEntity::class,
+        MinimalModeWindowEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -47,6 +53,10 @@ abstract class ScrollessDatabase : RoomDatabase() {
     abstract fun sessionSegmentDao(): SessionSegmentDao
 
     abstract fun redeemedGiftDao(): RedeemedGiftDao
+
+    abstract fun minimalModeAllowedAppDao(): MinimalModeAllowedAppDao
+
+    abstract fun minimalModeWindowDao(): MinimalModeWindowDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -294,6 +304,33 @@ abstract class ScrollessDatabase : RoomDatabase() {
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_settings ADD COLUMN inspector_overlay_enabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Minimal mode: the master switch, its clock anchor, and the first two list tables. */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN minimal_mode_enabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN minimal_anchor_wall INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN minimal_anchor_elapsed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_settings ADD COLUMN minimal_anchor_boot INTEGER NOT NULL DEFAULT -1")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS minimal_mode_allowed_apps (
+                        package_id TEXT NOT NULL,
+                        PRIMARY KEY(package_id)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS minimal_mode_windows (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        start_minute INTEGER NOT NULL,
+                        end_minute INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
             }
         }
     }
