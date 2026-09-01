@@ -69,9 +69,6 @@ object StrictModeGuard {
     /** Feed blocking can only be switched on while armed. */
     fun canChangeInstagramFeedBlocking(armed: Boolean, next: Boolean): Boolean = !armed || next
 
-    /** Minimal mode can only be switched on while armed. */
-    fun canChangeMinimalModeEnabled(armed: Boolean, next: Boolean): Boolean = !armed || next
-
     /**
      * Allowing one more app through minimal mode is a weakening, so it is refused while
      * armed. Removing one is always permitted — that direction only ever tightens.

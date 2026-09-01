@@ -178,12 +178,6 @@ abstract class UserSettingsDao : BaseDao<UserSettingsEntity> {
     @Query("UPDATE user_settings SET instagram_feed_blocking_enabled = :enabled WHERE id = 1")
     abstract suspend fun setInstagramFeedBlockingEnabled(enabled: Boolean)
 
-    @Query("SELECT minimal_mode_enabled FROM user_settings WHERE id = 1")
-    abstract fun getMinimalModeEnabled(): Flow<Boolean>
-
-    @Query("UPDATE user_settings SET minimal_mode_enabled = :enabled WHERE id = 1")
-    abstract suspend fun setMinimalModeEnabled(enabled: Boolean)
-
     @Query("SELECT minimal_anchor_wall FROM user_settings WHERE id = 1")
     abstract fun getMinimalAnchorWall(): Flow<Long>
 

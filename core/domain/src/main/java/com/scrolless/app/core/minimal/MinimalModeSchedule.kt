@@ -31,14 +31,15 @@ data class MinimalModeWindow(val startMinuteOfDay: Int, val endMinuteOfDay: Int)
     } else {
         minuteOfDay >= startMinuteOfDay || minuteOfDay < endMinuteOfDay
     }
-
-    /** Every minute this window covers. Used to compare schedules for strictness. */
-    fun coveredMinutes(): Set<Int> = (0 until MinimalModeSchedule.MINUTES_PER_DAY)
-        .filterTo(mutableSetOf(), ::contains)
 }
 
 /**
- * Decides whether minimal mode is in force right now, and when that answer next changes.
+ * Decides whether the allowlist is in force right now, and when that answer next changes.
+ *
+ * **An empty schedule means always.** The allowlist is switched on by picking Block All, not
+ * by the hours, so hours are a way to *narrow* it to part of the day rather than the thing
+ * that turns it on. Reading empty as "never" would mean choosing Block All and getting
+ * nothing, which is the opposite of what that mode promises.
  *
  * Pure and minute-granular. Callers hold the clock; see
  * [com.scrolless.app.core.blocking.time.TrustedWallClock] for reading one that a user
@@ -49,7 +50,7 @@ object MinimalModeSchedule {
     const val MINUTES_PER_DAY = 24 * 60
     const val MILLIS_PER_MINUTE = 60_000L
 
-    fun isOpen(windows: List<MinimalModeWindow>, minuteOfDay: Int): Boolean = windows.any { it.contains(minuteOfDay) }
+    fun isOpen(windows: List<MinimalModeWindow>, minuteOfDay: Int): Boolean = windows.isEmpty() || windows.any { it.contains(minuteOfDay) }
 
     /**
      * Millis from the start of [minuteOfDay] until [isOpen] flips.
@@ -60,9 +61,8 @@ object MinimalModeSchedule {
      * and only when a transition is being scheduled.
      *
      * The result is measured from the start of the current minute, so a caller that wants a
-     * delay from *now* must subtract however far into the minute it already is. With no
-     * windows, or with windows covering the whole day, there is no transition and a full day
-     * is returned.
+     * delay from *now* must subtract however far into the minute it already is. A schedule
+     * with no transitions at all — empty, or covering the whole day — returns a full day.
      */
     fun millisUntilNextTransition(windows: List<MinimalModeWindow>, minuteOfDay: Int): Long {
         val openNow = isOpen(windows, minuteOfDay)
@@ -73,12 +73,21 @@ object MinimalModeSchedule {
         return MINUTES_PER_DAY * MILLIS_PER_MINUTE
     }
 
-    /** Every minute of the day covered by any of [windows]. */
-    fun coveredMinutes(windows: List<MinimalModeWindow>): Set<Int> = windows.flatMapTo(mutableSetOf()) { it.coveredMinutes() }
+    /**
+     * Every minute of the day the allowlist would be in force.
+     *
+     * Defined through [isOpen] rather than by unioning the windows, so the "empty means
+     * always" rule cannot drift apart between the two.
+     */
+    fun coveredMinutes(windows: List<MinimalModeWindow>): Set<Int> =
+        (0 until MINUTES_PER_DAY).filterTo(mutableSetOf()) { isOpen(windows, it) }
 
     /**
      * Whether [next] keeps every minute [current] already covered. Shrinking protection is
      * what strict mode refuses; widening it is always allowed.
+     *
+     * Note what the empty rule does here: going from no hours to *any* hours is a shrink,
+     * because no hours means the whole day.
      */
     fun covers(current: List<MinimalModeWindow>, next: List<MinimalModeWindow>): Boolean =
         coveredMinutes(next).containsAll(coveredMinutes(current))

@@ -213,14 +213,20 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     /** Separate from [videoCheckHandler] so stopping periodic checks cannot cancel grace re-checks. */
     private val graceCheckHandler = Handler(Looper.getMainLooper())
 
-    /** Master switch for minimal mode; the schedule below only applies while this is on. */
-    private var currentMinimalModeEnabled: Boolean = false
+    /**
+     * The allowlist is what [BlockOption.BlockAll] now means: not "block every supported
+     * short-form surface" but "close every app that is not allowed". There is no separate
+     * switch — picking the mode is the switch.
+     */
+    private val isAllowlistModeSelected: Boolean
+        get() = currentBlockOption == BlockOption.BlockAll
 
+    /** Optional narrowing of [isAllowlistModeSelected] to part of the day; empty means always. */
     private var currentMinimalModeWindows: List<MinimalModeWindow> = emptyList()
 
     private var currentMinimalModeAllowedApps: Set<String> = emptySet()
 
-    /** Whether a minimal-mode window is open right now, recomputed on edges and on events. */
+    /** Whether the allowlist is in force right now, recomputed on edges and on events. */
     private var minimalModeWindowOpen: Boolean = false
 
     /**
@@ -348,6 +354,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
                     Timber.d("Settings changed, re-initializing blocking manager with %s", blockOption)
                     currentBlockOption = blockOption
                     blockingManager.init(blockOption)
+
+                    // Block All is also what arms the allowlist, so the package filter and the
+                    // clock anchor have to follow the mode.
+                    if (isAllowlistModeSelected) ensureMinimalModeAnchor()
+                    refreshMinimalModeWindow()
                 }
         }
 
@@ -372,13 +383,6 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         // Each of these changes what counts as allowed or when, so the window is re-evaluated
         // and — unlike the other content toggles — the package filter itself is refreshed.
-        serviceScope.launch {
-            userSettingsStore.getMinimalModeEnabled().collect { enabled ->
-                currentMinimalModeEnabled = enabled
-                if (enabled) ensureMinimalModeAnchor()
-                refreshMinimalModeWindow()
-            }
-        }
         serviceScope.launch {
             minimalModeStore.getWindows().collect { windows ->
                 currentMinimalModeWindows = windows
@@ -529,7 +533,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         // A scheduled edge can be missed while the device sleeps, so every event is also a
         // chance to notice the window opened or closed.
-        if (currentMinimalModeEnabled && isMinimalModeWindowOpenNow() != minimalModeWindowOpen) {
+        if (isAllowlistModeSelected && isMinimalModeWindowOpenNow() != minimalModeWindowOpen) {
             refreshMinimalModeWindow()
         }
 
@@ -1125,10 +1129,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     }
 
     private fun isMinimalModeWindowOpenNow(): Boolean = when {
-        !currentMinimalModeEnabled -> false
+        !isAllowlistModeSelected -> false
 
-        currentMinimalModeWindows.isEmpty() -> false
-
+        // No hours configured means all of them; see MinimalModeSchedule.
         // Fail open rather than into a phone that cannot reach its home screen.
         launcherPackageIds.isEmpty() -> false
 
@@ -1180,7 +1183,8 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      */
     private fun scheduleMinimalModeTransition() {
         minimalModeHandler.removeCallbacks(minimalModeTransitionRunnable)
-        if (!currentMinimalModeEnabled || currentMinimalModeWindows.isEmpty()) return
+        // With no hours the allowlist never turns off, so there is no edge to wake for.
+        if (!isAllowlistModeSelected || currentMinimalModeWindows.isEmpty()) return
 
         val now = trustedNowMillis()
         val untilBoundary = MinimalModeSchedule.millisUntilNextTransition(currentMinimalModeWindows, minuteOfDay(now))

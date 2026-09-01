@@ -141,13 +141,6 @@ class StrictModeGuardTest : BaseTest() {
     }
 
     @Test
-    fun armed_minimalModeCanOnlyBeSwitchedOn() {
-        assertFalse(StrictModeGuard.canChangeMinimalModeEnabled(armed = true, next = false))
-        assertTrue(StrictModeGuard.canChangeMinimalModeEnabled(armed = true, next = true))
-        assertTrue(StrictModeGuard.canChangeMinimalModeEnabled(armed = false, next = false))
-    }
-
-    @Test
     fun armed_allowingOneMoreAppIsRefusedButRemovingIsNot() {
         assertFalse(StrictModeGuard.canAddAllowedApp(armed = true))
         assertTrue(StrictModeGuard.canAddAllowedApp(armed = false))
@@ -161,8 +154,9 @@ class StrictModeGuardTest : BaseTest() {
 
         assertTrue(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = wider))
         assertFalse(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = narrower))
-        assertFalse(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = emptyList()))
-        assertTrue(StrictModeGuard.canChangeMinimalModeSchedule(armed = false, current = current, next = emptyList()))
+        // No hours means all day, so clearing the schedule widens it rather than removing it.
+        assertTrue(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = current, next = emptyList()))
+        assertFalse(StrictModeGuard.canChangeMinimalModeSchedule(armed = true, current = emptyList(), next = current))
     }
 
     @Test

@@ -18,6 +18,7 @@ package com.scrolless.app.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.repository.UserSettingsStore
 import com.scrolless.app.core.strict.StrictModeGuard
 import com.scrolless.app.core.strict.StrictModeManager
@@ -46,7 +47,7 @@ class SettingsViewModel @Inject constructor(
         // together rather than pulling a flow helper across the module boundary.
         combine(
             userSettingsStore.getInstagramFeedBlockingEnabled(),
-            userSettingsStore.getMinimalModeEnabled(),
+            userSettingsStore.getActiveBlockOption(),
             ::ContentToggles,
         ),
     ) { pauseDurationMillis, exceptReelsSentByDm, timerOverlayEnabled, strictState, toggles ->
@@ -55,7 +56,7 @@ class SettingsViewModel @Inject constructor(
             exceptReelsSentByDm = exceptReelsSentByDm,
             timerOverlayEnabled = timerOverlayEnabled,
             instagramFeedBlockingEnabled = toggles.instagramFeed,
-            minimalModeEnabled = toggles.minimalMode,
+            allowlistModeSelected = toggles.blockOption == BlockOption.BlockAll,
             strictModeArmed = strictModeManager.isArmed(strictState),
             strictModeUntilMillis = strictState.untilAtMillis,
             strictModeRemainingMillis = strictModeManager.remainingMillis(strictState),
@@ -106,14 +107,15 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-private data class ContentToggles(val instagramFeed: Boolean, val minimalMode: Boolean)
+private data class ContentToggles(val instagramFeed: Boolean, val blockOption: BlockOption)
 
 data class SettingsUiState(
     val pauseDurationMinutes: Int = 5,
     val exceptReelsSentByDm: Boolean = false,
     val timerOverlayEnabled: Boolean = false,
     val instagramFeedBlockingEnabled: Boolean = false,
-    val minimalModeEnabled: Boolean = false,
+    /** Block All is selected, so the minimal-mode allowlist is what is in force. */
+    val allowlistModeSelected: Boolean = false,
     val strictModeArmed: Boolean = false,
     val strictModeUntilMillis: Long = 0L,
     val strictModeRemainingMillis: Long = 0L,
