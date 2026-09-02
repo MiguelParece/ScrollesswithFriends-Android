@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,8 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -74,7 +71,6 @@ fun MinimalModeScreen(onNavigateBack: () -> Unit, modifier: Modifier = Modifier,
         modifier = modifier,
         uiState = uiState,
         onNavigateBack = onNavigateBack,
-        onEnabledChange = viewModel::onEnabledChange,
         onAddWindow = viewModel::onAddWindow,
         onRemoveWindow = viewModel::onRemoveWindow,
         onAppAllowedChange = viewModel::onAppAllowedChange,
@@ -86,7 +82,6 @@ fun MinimalModeScreen(onNavigateBack: () -> Unit, modifier: Modifier = Modifier,
 private fun MinimalModeScreenContent(
     uiState: MinimalModeUiState,
     onNavigateBack: () -> Unit,
-    onEnabledChange: (Boolean) -> Unit,
     onAddWindow: (Int, Int) -> Unit,
     onRemoveWindow: (Int) -> Unit,
     onAppAllowedChange: (String, Boolean) -> Unit,
@@ -95,8 +90,7 @@ private fun MinimalModeScreenContent(
     val hapticHelper = rememberHapticHelper()
     var showWindowPicker by remember { mutableStateOf(false) }
 
-    // Switching the mode off and shrinking the schedule both weaken protection.
-    val lockedOff = uiState.strictModeArmed && uiState.enabled
+    // Shrinking the schedule weakens protection, so strict mode freezes it.
     val lockedSchedule = uiState.strictModeArmed
 
     Scaffold(
@@ -147,17 +141,29 @@ private fun MinimalModeScreenContent(
         ) {
             item {
                 MinimalModeCard {
-                    MinimalModeSwitchRow(
-                        title = stringResource(R.string.minimal_mode_enable_title),
-                        description = if (lockedOff) {
-                            stringResource(R.string.settings_locked_by_strict_mode)
-                        } else {
-                            stringResource(R.string.minimal_mode_enable_description)
-                        },
-                        checked = uiState.enabled,
-                        enabled = !lockedOff,
-                        onCheckedChange = onEnabledChange,
-                    )
+                    Column(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = if (uiState.allowlistModeSelected) {
+                                stringResource(R.string.minimal_mode_status_on)
+                            } else {
+                                stringResource(R.string.minimal_mode_status_off)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (uiState.allowlistModeSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        Text(
+                            text = stringResource(R.string.minimal_mode_enable_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -263,57 +269,6 @@ private fun MinimalModeSectionLabel(label: String, modifier: Modifier = Modifier
         fontWeight = FontWeight.SemiBold,
         modifier = modifier.padding(start = 2.dp, top = 10.dp),
     )
-}
-
-@Composable
-private fun MinimalModeSwitchRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val hapticHelper = rememberHapticHelper()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(
-            checked = checked,
-            enabled = enabled,
-            onCheckedChange = { isOn ->
-                hapticHelper.playToggle(isOn)
-                onCheckedChange(isOn)
-            },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
-            ),
-            modifier = Modifier.size(width = 58.dp, height = 36.dp),
-        )
-    }
 }
 
 @Composable

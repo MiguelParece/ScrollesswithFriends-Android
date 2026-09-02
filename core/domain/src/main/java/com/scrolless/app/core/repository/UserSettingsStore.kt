@@ -97,9 +97,6 @@ interface UserSettingsStore {
     fun getStrictAnchorBoot(): Flow<Int>
     suspend fun updateStrictModeState(strictUntilAt: Long, anchorWallMillis: Long, anchorElapsedMillis: Long, anchorBootCount: Int)
 
-    fun getMinimalModeEnabled(): Flow<Boolean>
-    suspend fun setMinimalModeEnabled(enabled: Boolean)
-
     fun getMinimalAnchorWall(): Flow<Long>
     fun getMinimalAnchorElapsed(): Flow<Long>
     fun getMinimalAnchorBoot(): Flow<Int>

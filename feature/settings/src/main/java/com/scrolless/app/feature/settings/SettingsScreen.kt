@@ -225,7 +225,7 @@ private fun SettingsScreenContent(
 
                 SettingsNavigationItem(
                     title = stringResource(R.string.settings_minimal_mode_title),
-                    description = if (uiState.minimalModeEnabled) {
+                    description = if (uiState.allowlistModeSelected) {
                         stringResource(R.string.settings_minimal_mode_description_on)
                     } else {
                         stringResource(R.string.settings_minimal_mode_description_off)

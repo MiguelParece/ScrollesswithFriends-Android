@@ -19,6 +19,7 @@ package com.scrolless.app.feature.settings.minimal
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scrolless.app.core.minimal.MinimalModeWindow
+import com.scrolless.app.core.model.BlockOption
 import com.scrolless.app.core.repository.InstalledApp
 import com.scrolless.app.core.repository.InstalledAppsProvider
 import com.scrolless.app.core.repository.MinimalModeStore
@@ -45,14 +46,14 @@ class MinimalModeViewModel @Inject constructor(
     private val installedApps = MutableStateFlow<List<InstalledApp>?>(null)
 
     val uiState: StateFlow<MinimalModeUiState> = combine(
-        userSettingsStore.getMinimalModeEnabled(),
+        userSettingsStore.getActiveBlockOption(),
         minimalModeStore.getWindows(),
         minimalModeStore.getAllowedApps(),
         strictModeManager.observeState(),
         installedApps,
-    ) { enabled, windows, allowedApps, strictState, apps ->
+    ) { blockOption, windows, allowedApps, strictState, apps ->
         MinimalModeUiState(
-            enabled = enabled,
+            allowlistModeSelected = blockOption == BlockOption.BlockAll,
             windows = windows,
             allowedApps = allowedApps,
             installedApps = apps.orEmpty(),
@@ -69,14 +70,6 @@ class MinimalModeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             installedApps.value = installedAppsProvider.launchableApps()
-        }
-    }
-
-    fun onEnabledChange(checked: Boolean) {
-        // Switching minimal mode off removes protection; strict mode only allows switching on.
-        if (!StrictModeGuard.canChangeMinimalModeEnabled(uiState.value.strictModeArmed, checked)) return
-        viewModelScope.launch {
-            userSettingsStore.setMinimalModeEnabled(checked)
         }
     }
 
@@ -110,7 +103,8 @@ class MinimalModeViewModel @Inject constructor(
 }
 
 data class MinimalModeUiState(
-    val enabled: Boolean = false,
+    /** Whether Block All is the active mode, which is what puts the allowlist in force. */
+    val allowlistModeSelected: Boolean = false,
     val windows: List<MinimalModeWindow> = emptyList(),
     val allowedApps: Set<String> = emptySet(),
     val installedApps: List<InstalledApp> = emptyList(),

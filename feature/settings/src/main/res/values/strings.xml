@@ -61,19 +61,21 @@
 
     <string name="settings_minimal_mode_title">Minimal mode</string>
 
-    <string name="settings_minimal_mode_description_off">Off — reduce the phone to a few apps during chosen hours</string>
+    <string name="settings_minimal_mode_description_off">Pick Block All to reduce the phone to your allowlist</string>
 
-    <string name="settings_minimal_mode_description_on">On — only your allowlist opens during the scheduled hours</string>
+    <string name="settings_minimal_mode_description_on">Active — Block All is reducing the phone to your allowlist</string>
 
     <string name="minimal_mode_title">Minimal mode</string>
 
-    <string name="minimal_mode_enable_title">Reduce the phone</string>
+    <string name="minimal_mode_status_on">Active</string>
 
-    <string name="minimal_mode_enable_description">During the hours below, anything outside your allowlist closes itself. Calls, alarms, the home screen and the keyboard always stay available.</string>
+    <string name="minimal_mode_status_off">Not active</string>
 
-    <string name="minimal_mode_schedule_section">Hours</string>
+    <string name="minimal_mode_enable_description">Block All now means this: while it is the chosen mode, anything outside your allowlist closes itself. Calls, alarms, the home screen, the keyboard and Scrolless always stay available. Short-form content stays blocked inside the apps you do allow.</string>
 
-    <string name="minimal_mode_no_windows">No hours set, so nothing is blocked yet.</string>
+    <string name="minimal_mode_schedule_section">Hours (optional)</string>
+
+    <string name="minimal_mode_no_windows">No hours set, so this applies all day. Add hours to narrow it to part of the day.</string>
 
     <string name="minimal_mode_add_window">Add hours</string>
 
@@ -93,7 +95,7 @@
 
     <string name="minimal_mode_apps_section">Allowed apps</string>
 
-    <string name="minimal_mode_apps_description">Everything unticked closes during those hours. Settings is not allowed by default — tick it here if you want it reachable.</string>
+    <string name="minimal_mode_apps_description">Everything unticked closes while Block All is on. Settings is not allowed by default — tick it here if you want it reachable.</string>
 
     <string name="minimal_mode_loading_apps">Reading the installed apps…</string>
 

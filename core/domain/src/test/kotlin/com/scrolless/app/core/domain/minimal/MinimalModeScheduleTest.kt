@@ -34,10 +34,22 @@ private val NIGHT = MinimalModeWindow(at(22), at(8))
 
 class MinimalModeScheduleTest : BaseTest() {
 
+    /**
+     * Hours narrow the allowlist; they are not what switches it on. Reading no hours as
+     * "never" would mean picking Block All and getting nothing.
+     */
     @Test
-    fun noWindowsIsNeverOpen() {
-        assertFalse(MinimalModeSchedule.isOpen(emptyList(), at(3)))
-        assertFalse(MinimalModeSchedule.isOpen(emptyList(), at(14)))
+    fun noWindowsMeansAlwaysOpen() {
+        assertTrue(MinimalModeSchedule.isOpen(emptyList(), at(3)))
+        assertTrue(MinimalModeSchedule.isOpen(emptyList(), at(14)))
+    }
+
+    @Test
+    fun noWindowsCoversTheWholeDay() {
+        assertEquals(
+            MinimalModeSchedule.MINUTES_PER_DAY,
+            MinimalModeSchedule.coveredMinutes(emptyList()).size,
+        )
     }
 
     @Test
@@ -123,6 +135,15 @@ class MinimalModeScheduleTest : BaseTest() {
             fullDay,
             MinimalModeSchedule.millisUntilNextTransition(listOf(MinimalModeWindow(0, 0)), at(10)),
         )
+    }
+
+    /** No hours is the widest schedule there is, so adding any is a shrink. */
+    @Test
+    fun addingHoursToAnEmptyScheduleIsAShrink() {
+        val anyHours = listOf(WORK_DAY)
+
+        assertFalse(MinimalModeSchedule.covers(current = emptyList(), next = anyHours))
+        assertTrue(MinimalModeSchedule.covers(current = anyHours, next = emptyList()))
     }
 
     @Test

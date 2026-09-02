@@ -66,7 +66,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
     private val _strictAnchorWall = MutableStateFlow(0L)
     private val _strictAnchorElapsed = MutableStateFlow(0L)
     private val _strictAnchorBoot = MutableStateFlow(-1)
-    private val _minimalModeEnabled = MutableStateFlow(false)
     private val _minimalAnchorWall = MutableStateFlow(0L)
     private val _minimalAnchorElapsed = MutableStateFlow(0L)
     private val _minimalAnchorBoot = MutableStateFlow(-1)
@@ -155,9 +154,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
         }
         coroutineScope.launch {
             userSettingsDao.getStrictAnchorBoot().collect { _strictAnchorBoot.value = it }
-        }
-        coroutineScope.launch {
-            userSettingsDao.getMinimalModeEnabled().collect { _minimalModeEnabled.value = it }
         }
         coroutineScope.launch {
             userSettingsDao.getMinimalAnchorWall().collect { _minimalAnchorWall.value = it }
@@ -370,13 +366,6 @@ class UserSettingsStoreImpl @Inject constructor(private val userSettingsDao: Use
             anchorElapsedMillis = anchorElapsedMillis,
             anchorBootCount = anchorBootCount,
         )
-    }
-
-    override fun getMinimalModeEnabled(): Flow<Boolean> = _minimalModeEnabled
-
-    override suspend fun setMinimalModeEnabled(enabled: Boolean) {
-        _minimalModeEnabled.value = enabled
-        userSettingsDao.setMinimalModeEnabled(enabled)
     }
 
     override fun getMinimalAnchorWall(): Flow<Long> = _minimalAnchorWall
