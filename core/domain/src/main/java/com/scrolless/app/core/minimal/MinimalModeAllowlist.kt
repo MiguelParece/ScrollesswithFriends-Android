@@ -75,6 +75,10 @@ object MinimalModeAllowlist {
      *   mistaken for opening a blocked one.
      * @param ownPackageId Scrolless itself, which differs between the debug and release
      *   flavours and so cannot be a constant.
+     * @param launchablePackageIds every package with a launcher icon, which is exactly what
+     *   the app picker can offer. Anything outside it is unreachable in the picker, so it
+     *   must never be kicked — see the rule below. An empty set disables kicking entirely,
+     *   matching how an unresolvable launcher disables the feature.
      */
     fun allows(
         packageId: String,
@@ -82,12 +86,24 @@ object MinimalModeAllowlist {
         launcherPackageIds: Set<String>,
         imePackageId: String?,
         ownPackageId: String,
+        launchablePackageIds: Set<String>,
     ): Boolean = when {
         packageId.isBlank() -> true
+
         packageId in CORE_PACKAGES -> true
+
         packageId in launcherPackageIds -> true
+
         packageId == imePackageId -> true
+
         packageId == ownPackageId -> true
-        else -> packageId in userAllowed
+
+        packageId in userAllowed -> true
+
+        // Nothing the picker cannot offer may be closed. Fingerprint and face prompts,
+        // permission dialogs, share sheets, autofill and carrier surfaces have no launcher
+        // icon, so the user has no way to tick them — kicking them would be a block the user
+        // can neither predict nor undo, and it takes the app underneath down with it.
+        else -> packageId !in launchablePackageIds
     }
 }

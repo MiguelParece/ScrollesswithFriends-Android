@@ -32,9 +32,17 @@ class PackageManagerInstalledAppsProvider @Inject constructor(private val contex
      * `<queries>` element grants. Runs on IO: reading every label touches each app's resources
      * and takes long enough to drop frames on a device with a lot installed.
      */
+    override suspend fun launchablePackageIds(): Set<String> = withContext(Dispatchers.IO) {
+        context.packageManager
+            .queryIntentActivities(launcherIntent(), PackageManager.MATCH_ALL)
+            .mapNotNullTo(mutableSetOf()) { it.activityInfo?.packageName }
+    }
+
+    private fun launcherIntent() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+
     override suspend fun launchableApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val packageManager = context.packageManager
-        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val launcherIntent = launcherIntent()
 
         packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
             .asSequence()

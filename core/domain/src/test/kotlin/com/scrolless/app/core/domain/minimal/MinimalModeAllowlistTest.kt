@@ -30,13 +30,16 @@ private const val WHATSAPP = "com.whatsapp"
 
 class MinimalModeAllowlistTest : BaseTest() {
 
-    private fun allows(packageId: String, userAllowed: Set<String> = emptySet()) = MinimalModeAllowlist.allows(
-        packageId = packageId,
-        userAllowed = userAllowed,
-        launcherPackageIds = setOf(LAUNCHER, SECOND_LAUNCHER),
-        imePackageId = KEYBOARD,
-        ownPackageId = OWN,
-    )
+    /** By default the package under test has a launcher icon, so it is a candidate for kicking. */
+    private fun allows(packageId: String, userAllowed: Set<String> = emptySet(), launchablePackageIds: Set<String> = setOf(packageId)) =
+        MinimalModeAllowlist.allows(
+            packageId = packageId,
+            userAllowed = userAllowed,
+            launcherPackageIds = setOf(LAUNCHER, SECOND_LAUNCHER),
+            imePackageId = KEYBOARD,
+            ownPackageId = OWN,
+            launchablePackageIds = launchablePackageIds,
+        )
 
     @Test
     fun anUnknownAppIsRefused() {
@@ -100,6 +103,32 @@ class MinimalModeAllowlistTest : BaseTest() {
         assertTrue(allows("com.google.android.deskclock"))
     }
 
+    /**
+     * The regression that closed banking apps: the fingerprint prompt owns the focused window
+     * while it is up, has no launcher icon, and so could never be ticked in the picker.
+     * Kicking it took down the app that asked for authentication.
+     */
+    @Test
+    fun aSystemSurfaceWithoutALauncherIconIsNeverKicked() {
+        val installed = setOf("com.instagram.android", WHATSAPP)
+
+        assertTrue(allows("com.samsung.android.biometrics", launchablePackageIds = installed))
+        assertTrue(allows("com.android.permissioncontroller", launchablePackageIds = installed))
+        assertTrue(allows("com.google.android.permissioncontroller", launchablePackageIds = installed))
+    }
+
+    /** An app with an icon is still fair game — the rule must not exempt everything. */
+    @Test
+    fun aLaunchableAppIsStillRefused() {
+        assertFalse(allows("com.instagram.android", launchablePackageIds = setOf("com.instagram.android")))
+    }
+
+    /** Before the first query lands there is nothing to judge against, so nothing is kicked. */
+    @Test
+    fun anEmptyLaunchableSetKicksNothing() {
+        assertTrue(allows("com.instagram.android", launchablePackageIds = emptySet()))
+    }
+
     /** Reaching Settings is how blocking gets switched off; it is opt-in, not core. */
     @Test
     fun settingsIsNotInTheSafetyCore() {
@@ -117,6 +146,7 @@ class MinimalModeAllowlistTest : BaseTest() {
                 launcherPackageIds = emptySet(),
                 imePackageId = null,
                 ownPackageId = OWN,
+                launchablePackageIds = setOf("com.instagram.android"),
             ),
         )
     }

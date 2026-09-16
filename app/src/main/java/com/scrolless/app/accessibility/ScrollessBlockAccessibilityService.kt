@@ -30,6 +30,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import com.scrolless.app.R
 import com.scrolless.app.core.blocking.BlockingManager
@@ -45,6 +46,7 @@ import com.scrolless.app.core.model.BlockingResult
 import com.scrolless.app.core.model.DetectionMethod
 import com.scrolless.app.core.model.ResolvedBlockableApp
 import com.scrolless.app.core.model.StrictModeState
+import com.scrolless.app.core.repository.InstalledAppsProvider
 import com.scrolless.app.core.repository.MinimalModeStore
 import com.scrolless.app.core.repository.SessionTracker
 import com.scrolless.app.core.repository.UserSettingsStore
@@ -149,6 +151,10 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var minimalModeStore: MinimalModeStore
 
+    /** Tells a real, pickable app from a system surface the user could never allow. */
+    @Inject
+    lateinit var installedAppsProvider: InstalledAppsProvider
+
     /** Wall clock, elapsed realtime and boot count, so minimal mode can derive a trusted now. */
     @Inject
     lateinit var timeProvider: TimeProvider
@@ -237,6 +243,16 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     /** Current keyboard, so typing in an allowed app is not read as opening a blocked one. */
     private var imePackageId: String? = null
+
+    /**
+     * Every package with a launcher icon — exactly what the app picker can offer.
+     *
+     * Empty until the first query lands, which leaves the guard inert for a moment rather
+     * than risking a kick it cannot justify.
+     */
+    private var launchablePackageIds: Set<String> = emptySet()
+
+    private var lastLaunchableRefreshElapsed: Long = 0L
 
     private var minimalAnchorWall: Long = 0L
     private var minimalAnchorElapsed: Long = 0L
@@ -380,6 +396,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Minimal mode needs to know the home screen and the keyboard before it can kick
         // anything, or it would close the very screens the user needs to recover.
         resolveMinimalModeSystemPackages()
+        serviceScope.launch { refreshLaunchablePackages() }
 
         // Each of these changes what counts as allowed or when, so the window is re-evaluated
         // and — unlike the other content toggles — the package filter itself is refreshed.
@@ -540,8 +557,15 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Minimal mode closes anything outside the allowlist. It sits above the early return
         // below because an arbitrary app is not a BlockableApp, so nothing past this point
         // would ever see it.
-        if (minimalModeWindowOpen && !minimalModeAllows(packageId) && handleMinimalModeEvent(packageId)) {
-            return
+        if (minimalModeWindowOpen) {
+            // A package nobody has heard of may simply have been installed since the last
+            // look, so refresh before writing it off as a system surface.
+            if (packageId.isNotBlank() && packageId !in launchablePackageIds) {
+                refreshLaunchablePackagesThrottled()
+            }
+            if (!minimalModeAllows(packageId) && handleMinimalModeEvent(packageId)) {
+                return
+            }
         }
 
         // For unrelated apps, avoid touching the accessibility tree unless we're already tracking
@@ -1144,6 +1168,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         launcherPackageIds = launcherPackageIds,
         imePackageId = imePackageId,
         ownPackageId = packageName,
+        launchablePackageIds = launchablePackageIds,
     )
 
     /**
@@ -1166,6 +1191,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // so the foreground has to be checked directly or the app would survive the edge.
         if (open) {
             resolveMinimalModeSystemPackages()
+            refreshLaunchablePackagesThrottled()
             enforceMinimalModeOnForeground()
         }
     }
@@ -1195,6 +1221,34 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         minimalModeHandler.postDelayed(minimalModeTransitionRunnable, delay)
     }
 
+    /**
+     * Whether the focused window belongs to an app rather than to the system.
+     *
+     * Returns true when the window list is unavailable: the launcher-icon rule is the real
+     * protection here, and refusing to act on missing window info would disable the guard on
+     * any device that does not report windows.
+     */
+    private fun isApplicationWindowFocused(): Boolean {
+        val focused = windows.orEmpty().firstOrNull { it.isFocused } ?: return true
+        return focused.type == AccessibilityWindowInfo.TYPE_APPLICATION
+    }
+
+    private fun refreshLaunchablePackagesThrottled() {
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (nowElapsed - lastLaunchableRefreshElapsed < LAUNCHABLE_REFRESH_MIN_INTERVAL_MILLIS) return
+        lastLaunchableRefreshElapsed = nowElapsed
+        serviceScope.launch { refreshLaunchablePackages() }
+    }
+
+    private suspend fun refreshLaunchablePackages() {
+        launchablePackageIds = try {
+            installedAppsProvider.launchablePackageIds()
+        } catch (e: Exception) {
+            Timber.e(e, "Minimal mode: could not list launchable apps, guard stays inert")
+            emptySet()
+        }
+    }
+
     private fun enforceMinimalModeOnForeground() {
         val activePackage = rootInActiveWindow?.packageName?.toString() ?: return
         if (minimalModeAllows(activePackage)) return
@@ -1209,6 +1263,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // another app owns the screen. Acting on those would close the allowed app underneath.
         val activePackage = rootInActiveWindow?.packageName?.toString()
         if (activePackage != null && activePackage != packageId) return false
+
+        // Second line of defence behind the launcher-icon rule: fingerprint and face prompts,
+        // permission dialogs and system pickers are not application windows, and closing one
+        // takes down the app that asked for it.
+        if (!isApplicationWindowFocused()) return false
 
         kickFromMinimalMode(packageId)
 
@@ -1435,5 +1494,8 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         /** Floor on the edge alarm so a rounding error cannot spin the handler. */
         const val MINIMAL_TRANSITION_MIN_DELAY_MILLIS = 1_000L
+
+        /** Listing launcher entries is not free, so an unknown package refreshes at most this often. */
+        const val LAUNCHABLE_REFRESH_MIN_INTERVAL_MILLIS = 10_000L
     }
 }
