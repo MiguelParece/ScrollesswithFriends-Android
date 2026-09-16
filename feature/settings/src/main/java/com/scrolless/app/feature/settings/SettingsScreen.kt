@@ -83,6 +83,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit,
     onNavigateToMinimalMode: () -> Unit = {},
+    onNavigateToSocialApps: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
     giftViewModel: GiftViewModel = hiltViewModel(),
 ) {
@@ -97,6 +98,7 @@ fun SettingsScreen(
         onTimerOverlayEnabledChange = viewModel::onTimerOverlayEnabledChange,
         onNavigateBack = onNavigateBack,
         onNavigateToMinimalMode = onNavigateToMinimalMode,
+        onNavigateToSocialApps = onNavigateToSocialApps,
         onSendGiftClick = giftViewModel::onCreateGift,
         onArmStrictMode = viewModel::onArmStrictMode,
         onInstagramFeedBlockingEnabledChange = viewModel::onInstagramFeedBlockingEnabledChange,
@@ -120,6 +122,7 @@ private fun SettingsScreenContent(
     onTimerOverlayEnabledChange: (Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToMinimalMode: () -> Unit = {},
+    onNavigateToSocialApps: () -> Unit = {},
     onSendGiftClick: () -> Unit = {},
     onArmStrictMode: (Long) -> Unit = {},
     onInstagramFeedBlockingEnabledChange: (Boolean) -> Unit = {},
@@ -219,6 +222,18 @@ private fun SettingsScreenContent(
                 TimerOverlayItem(
                     checked = uiState.timerOverlayEnabled,
                     onCheckedChange = onTimerOverlayEnabledChange,
+                )
+
+                SettingsDivider()
+
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_social_apps_title),
+                    description = if (uiState.socialModeSelected) {
+                        stringResource(R.string.settings_social_apps_description_on)
+                    } else {
+                        stringResource(R.string.settings_social_apps_description_off)
+                    },
+                    onClick = onNavigateToSocialApps,
                 )
 
                 SettingsDivider()

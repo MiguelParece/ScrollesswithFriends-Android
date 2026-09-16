@@ -17,6 +17,7 @@
 package com.scrolless.app.core.domain.minimal
 
 import com.scrolless.app.core.domain.BaseTest
+import com.scrolless.app.core.guard.ProtectedPackages
 import com.scrolless.app.core.minimal.MinimalModeAllowlist
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -89,7 +90,7 @@ class MinimalModeAllowlistTest : BaseTest() {
 
     @Test
     fun theSafetyCoreIsAlwaysAllowed() {
-        MinimalModeAllowlist.CORE_PACKAGES.forEach { corePackage ->
+        ProtectedPackages.CORE_PACKAGES.forEach { corePackage ->
             assertTrue("$corePackage must never be kicked", allows(corePackage))
         }
     }

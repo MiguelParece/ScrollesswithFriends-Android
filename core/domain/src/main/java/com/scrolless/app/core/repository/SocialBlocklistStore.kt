@@ -14,19 +14,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.model
+package com.scrolless.app.core.repository
 
-enum class BlockOption {
-    BlockAll,
+import kotlinx.coroutines.flow.Flow
 
-    /**
-     * Closes whole social apps rather than the short-form surfaces inside them. The list is
-     * seeded from [com.scrolless.app.core.social.SocialApps.DEFAULT_PACKAGES] and edited by
-     * the user. Never rename: Room persists this by name.
-     */
-    SocialMedia,
-    DailyLimit,
-    IntervalTimer,
-    PartnerQuota,
-    NothingSelected,
+/**
+ * The apps Social Media mode closes.
+ *
+ * Its own store rather than a flag per app on the settings row, for the same reason the
+ * minimal-mode allowlist has one: this is a collection, and `user_settings` is a single row
+ * of scalars.
+ */
+interface SocialBlocklistStore {
+
+    fun getBlockedApps(): Flow<Set<String>>
+    suspend fun blockApp(packageId: String)
+    suspend fun unblockApp(packageId: String)
 }

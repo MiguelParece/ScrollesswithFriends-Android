@@ -593,6 +593,9 @@ private fun HomeContent(
             uiState.partnerQuotaUsedMillis >=
                 PartnerQuotaBlockHandler.DEFAULT_BASELINE_MILLIS + uiState.partnerQuotaGrantedMillis
 
+        // The listed apps never open while this mode is on.
+        BlockOption.SocialMedia -> true
+
         BlockOption.NothingSelected -> false
     }
 

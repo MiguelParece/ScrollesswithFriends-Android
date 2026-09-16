@@ -16,65 +16,19 @@
  */
 package com.scrolless.app.core.minimal
 
+import com.scrolless.app.core.guard.ProtectedPackages
+
 /**
- * Decides which packages survive while minimal mode is in force.
+ * Decides which packages survive while Block All is the chosen mode.
  *
- * This is the inverse of [com.scrolless.app.core.model.BlockableApp]: instead of naming what
- * to close, it names the little that stays open and closes everything else.
- *
- * The safety core below is not user-editable and not removable by any setting, because
- * getting it wrong while strict mode is armed means days without a dialer or an alarm and no
- * way back inside the app. Packages that vary per device — the launcher, the keyboard and
- * Scrolless' own build flavour — are resolved at runtime and passed in rather than guessed
- * here, and anything unknown resolves to "allow" rather than risking a phone that cannot
- * reach its own home screen.
+ * The inverse of [com.scrolless.app.core.model.BlockableApp]: instead of naming what to
+ * close, it names the little that stays open and closes everything else. The packages that
+ * may never be closed live in [ProtectedPackages], shared with Social Media mode.
  */
 object MinimalModeAllowlist {
 
     /**
-     * Always allowed, whatever the user picked.
-     *
-     * Settings is deliberately absent: reaching it is how blocking gets switched off, and
-     * strict mode already guards it. Anyone who wants it can add it from the app picker.
-     */
-    val CORE_PACKAGES: Set<String> = setOf(
-        // Status bar, notification shade, volume dialog, power menu, and on several OEMs the
-        // incoming-call UI as well.
-        "com.android.systemui",
-
-        // Calls. Telecom routes them, incallui draws the in-call screen, and the rest are the
-        // dialer under its various OEM names.
-        "com.android.server.telecom",
-        "com.android.incallui",
-        "com.android.dialer",
-        "com.google.android.dialer",
-        "com.samsung.android.dialer",
-        "com.samsung.android.incallui",
-
-        // Emergency dialing must never be reachable-by-luck.
-        "com.android.phone",
-        "com.android.emergency",
-
-        // Alarms are how people wake up.
-        "com.google.android.deskclock",
-        "com.sec.android.app.clockpackage",
-
-        // The platform itself: the app chooser, permission dialogs and system alerts all run
-        // here. Kicking it would trap the user in whatever prompt was on screen.
-        "android",
-    )
-
-    /**
-     * @param packageId the package owning the foreground window; blank when the window does
-     *   not report one, which is treated as allowed because it cannot be classified.
-     * @param launcherPackageIds every package answering the home intent, not just the default
-     *   one. A device with two launchers and no default sends home to the system chooser, and
-     *   a single package id would leave the other launcher unprotected against a kick loop.
-     *   An empty set must disable the feature upstream rather than reach here.
-     * @param imePackageId the current keyboard, so typing inside an allowed app is not
-     *   mistaken for opening a blocked one.
-     * @param ownPackageId Scrolless itself, which differs between the debug and release
-     *   flavours and so cannot be a constant.
+     * @param userAllowed the apps ticked in the picker.
      * @param launchablePackageIds every package with a launcher icon, which is exactly what
      *   the app picker can offer. Anything outside it is unreachable in the picker, so it
      *   must never be kicked — see the rule below. An empty set disables kicking entirely,
@@ -88,15 +42,7 @@ object MinimalModeAllowlist {
         ownPackageId: String,
         launchablePackageIds: Set<String>,
     ): Boolean = when {
-        packageId.isBlank() -> true
-
-        packageId in CORE_PACKAGES -> true
-
-        packageId in launcherPackageIds -> true
-
-        packageId == imePackageId -> true
-
-        packageId == ownPackageId -> true
+        ProtectedPackages.isProtected(packageId, launcherPackageIds, imePackageId, ownPackageId) -> true
 
         packageId in userAllowed -> true
 

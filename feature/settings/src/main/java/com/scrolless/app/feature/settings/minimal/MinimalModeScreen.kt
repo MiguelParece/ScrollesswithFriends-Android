@@ -16,31 +16,21 @@
  */
 package com.scrolless.app.feature.settings.minimal
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,18 +40,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.scrolless.app.core.minimal.MinimalModeWindow
-import com.scrolless.app.core.repository.InstalledApp
 import com.scrolless.app.designsystem.util.rememberHapticHelper
 import com.scrolless.app.feature.settings.R
+import com.scrolless.app.feature.settings.apps.AppPickerCard
+import com.scrolless.app.feature.settings.apps.AppPickerRow
+import com.scrolless.app.feature.settings.apps.AppPickerScaffold
+import com.scrolless.app.feature.settings.apps.AppPickerSectionLabel
+import com.scrolless.app.feature.settings.apps.AppPickerStatusCard
 
 @Composable
 fun MinimalModeScreen(onNavigateBack: () -> Unit, modifier: Modifier = Modifier, viewModel: MinimalModeViewModel = hiltViewModel()) {
@@ -77,7 +68,6 @@ fun MinimalModeScreen(onNavigateBack: () -> Unit, modifier: Modifier = Modifier,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MinimalModeScreenContent(
     uiState: MinimalModeUiState,
@@ -90,150 +80,90 @@ private fun MinimalModeScreenContent(
     val hapticHelper = rememberHapticHelper()
     var showWindowPicker by remember { mutableStateOf(false) }
 
-    // Shrinking the schedule weakens protection, so strict mode freezes it.
-    val lockedSchedule = uiState.strictModeArmed
-
-    Scaffold(
+    AppPickerScaffold(
+        title = stringResource(R.string.minimal_mode_title),
+        onNavigateBack = onNavigateBack,
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.minimal_mode_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+    ) {
+        item {
+            AppPickerStatusCard(
+                status = if (uiState.allowlistModeSelected) {
+                    stringResource(R.string.app_picker_status_on)
+                } else {
+                    stringResource(R.string.app_picker_status_off)
                 },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            hapticHelper.playTick()
-                            onNavigateBack()
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                ),
+                active = uiState.allowlistModeSelected,
+                description = stringResource(R.string.minimal_mode_enable_description),
             )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 28.dp),
-        ) {
-            item {
-                MinimalModeCard {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+        }
+
+        item { AppPickerSectionLabel(stringResource(R.string.minimal_mode_schedule_section)) }
+
+        item {
+            AppPickerCard {
+                Column {
+                    if (uiState.windows.isEmpty()) {
                         Text(
-                            text = if (uiState.allowlistModeSelected) {
-                                stringResource(R.string.minimal_mode_status_on)
-                            } else {
-                                stringResource(R.string.minimal_mode_status_off)
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (uiState.allowlistModeSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                        Text(
-                            text = stringResource(R.string.minimal_mode_enable_description),
+                            text = stringResource(R.string.minimal_mode_no_windows),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                         )
                     }
-                }
-            }
-
-            item { MinimalModeSectionLabel(stringResource(R.string.minimal_mode_schedule_section)) }
-
-            item {
-                MinimalModeCard {
-                    Column {
-                        if (uiState.windows.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.minimal_mode_no_windows),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                            )
-                        }
-                        uiState.windows.forEachIndexed { index, window ->
-                            WindowRow(
-                                window = window,
-                                canRemove = !lockedSchedule,
-                                onRemove = { onRemoveWindow(index) },
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                hapticHelper.playTick()
-                                showWindowPicker = true
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                        ) {
-                            Text(stringResource(R.string.minimal_mode_add_window))
-                        }
+                    uiState.windows.forEachIndexed { index, window ->
+                        WindowRow(
+                            window = window,
+                            // Shrinking the schedule weakens protection, so it is frozen.
+                            canRemove = !uiState.strictModeArmed,
+                            onRemove = { onRemoveWindow(index) },
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            hapticHelper.playTick()
+                            showWindowPicker = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                    ) {
+                        Text(stringResource(R.string.minimal_mode_add_window))
                     }
                 }
             }
+        }
 
-            item { MinimalModeSectionLabel(stringResource(R.string.minimal_mode_apps_section)) }
+        item { AppPickerSectionLabel(stringResource(R.string.minimal_mode_apps_section)) }
 
+        item {
+            Text(
+                text = stringResource(R.string.minimal_mode_apps_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
+
+        if (uiState.loadingApps) {
             item {
                 Text(
-                    text = stringResource(R.string.minimal_mode_apps_description),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = stringResource(R.string.app_picker_loading),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
                 )
             }
+        }
 
-            if (uiState.loadingApps) {
-                item {
-                    Text(
-                        text = stringResource(R.string.minimal_mode_loading_apps),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
-                    )
-                }
-            }
-
-            items(uiState.installedApps, key = { it.packageId }) { app ->
-                val allowed = app.packageId in uiState.allowedApps
-                AppRow(
-                    app = app,
-                    allowed = allowed,
-                    // Removing an app always tightens, so only adding is locked.
-                    enabled = allowed || !uiState.strictModeArmed,
-                    onAllowedChange = { onAppAllowedChange(app.packageId, it) },
-                )
-            }
+        items(uiState.installedApps, key = { it.packageId }) { app ->
+            val allowed = app.packageId in uiState.allowedApps
+            AppPickerRow(
+                app = app,
+                checked = allowed,
+                // Removing an app always tightens, so only adding is locked.
+                enabled = allowed || !uiState.strictModeArmed,
+                onCheckedChange = { onAppAllowedChange(app.packageId, it) },
+            )
         }
     }
 
@@ -246,29 +176,6 @@ private fun MinimalModeScreenContent(
             },
         )
     }
-}
-
-@Composable
-private fun MinimalModeCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun MinimalModeSectionLabel(label: String, modifier: Modifier = Modifier) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(start = 2.dp, top = 10.dp),
-    )
 }
 
 @Composable
@@ -306,53 +213,6 @@ private fun WindowRow(window: MinimalModeWindow, canRemove: Boolean, onRemove: (
             },
         ) {
             Text(stringResource(R.string.minimal_mode_remove_window))
-        }
-    }
-}
-
-@Composable
-private fun AppRow(
-    app: InstalledApp,
-    allowed: Boolean,
-    enabled: Boolean,
-    onAllowedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val hapticHelper = rememberHapticHelper()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled) {
-                hapticHelper.playToggle(!allowed)
-                onAllowedChange(!allowed)
-            }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Checkbox(
-            checked = allowed,
-            enabled = enabled,
-            onCheckedChange = { isOn ->
-                hapticHelper.playToggle(isOn)
-                onAllowedChange(isOn)
-            },
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = app.packageId,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

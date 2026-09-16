@@ -146,6 +146,21 @@ class StrictModeGuardTest : BaseTest() {
         assertTrue(StrictModeGuard.canAddAllowedApp(armed = false))
     }
 
+    /** The social list is the mirror image of the allowlist: adding tightens, removing weakens. */
+    @Test
+    fun armed_removingASocialAppIsRefusedButAddingIsNot() {
+        assertFalse(StrictModeGuard.canUnblockSocialApp(armed = true))
+        assertTrue(StrictModeGuard.canUnblockSocialApp(armed = false))
+    }
+
+    @Test
+    fun armed_socialMediaIsStrongerThanTimeRationingButWeakerThanBlockAll() {
+        assertTrue(StrictModeGuard.canChangeBlockOption(armed = true, BlockOption.PartnerQuota, BlockOption.SocialMedia))
+        assertTrue(StrictModeGuard.canChangeBlockOption(armed = true, BlockOption.SocialMedia, BlockOption.BlockAll))
+        assertFalse(StrictModeGuard.canChangeBlockOption(armed = true, BlockOption.SocialMedia, BlockOption.PartnerQuota))
+        assertFalse(StrictModeGuard.canChangeBlockOption(armed = true, BlockOption.BlockAll, BlockOption.SocialMedia))
+    }
+
     @Test
     fun armed_minimalModeScheduleMayGrowButNotShrink() {
         val current = listOf(MinimalModeWindow(startMinuteOfDay = 22 * 60, endMinuteOfDay = 8 * 60))
