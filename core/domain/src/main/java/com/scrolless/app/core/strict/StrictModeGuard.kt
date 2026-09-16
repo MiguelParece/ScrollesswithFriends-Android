@@ -34,10 +34,18 @@ object StrictModeGuard {
      * lower rank while armed is refused.
      */
     fun strictnessRank(option: BlockOption): Int = when (option) {
-        BlockOption.BlockAll -> 4
+        BlockOption.BlockAll -> 5
+
+        // Closes social apps outright, so it protects more than any option that merely
+        // rations time — but less than the allowlist, which closes everything else too.
+        BlockOption.SocialMedia -> 4
+
         BlockOption.PartnerQuota -> 3
+
         BlockOption.IntervalTimer -> 2
+
         BlockOption.DailyLimit -> 1
+
         BlockOption.NothingSelected -> 0
     }
 
@@ -74,6 +82,13 @@ object StrictModeGuard {
      * armed. Removing one is always permitted — that direction only ever tightens.
      */
     fun canAddAllowedApp(armed: Boolean): Boolean = !armed
+
+    /**
+     * Taking an app off the social list lets it open again, so it is refused while armed.
+     * Adding one is always permitted — the inverse of the allowlist, where adding is what
+     * weakens.
+     */
+    fun canUnblockSocialApp(armed: Boolean): Boolean = !armed
 
     /**
      * The schedule may grow but never shrink: [next] has to keep every minute of the day

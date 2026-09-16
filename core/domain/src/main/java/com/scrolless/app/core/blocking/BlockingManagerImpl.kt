@@ -103,6 +103,12 @@ class BlockingManagerImpl @Inject constructor(
     ): BlockOptionHandler = when (blockOption) {
         BlockOption.BlockAll -> BlockAllBlockHandler(timeProvider).also { Timber.d("Using BlockAll handler") }
 
+        // Social Media mode closes whole apps through the package guard in the accessibility
+        // service, which this pipeline knows nothing about. It still needs a content handler
+        // so short-form stays blocked in whatever is left — Shorts inside a YouTube that the
+        // social list deliberately leaves open, for instance.
+        BlockOption.SocialMedia -> BlockAllBlockHandler(timeProvider).also { Timber.d("Using BlockAll handler for SocialMedia") }
+
         BlockOption.DailyLimit -> DayLimitBlockHandler(timeLimit).also { Timber.d("Using DayLimit handler (limit=%d)", timeLimit) }
 
         BlockOption.IntervalTimer ->

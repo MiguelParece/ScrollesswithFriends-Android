@@ -57,6 +57,7 @@ class SettingsViewModel @Inject constructor(
             timerOverlayEnabled = timerOverlayEnabled,
             instagramFeedBlockingEnabled = toggles.instagramFeed,
             allowlistModeSelected = toggles.blockOption == BlockOption.BlockAll,
+            socialModeSelected = toggles.blockOption == BlockOption.SocialMedia,
             strictModeArmed = strictModeManager.isArmed(strictState),
             strictModeUntilMillis = strictState.untilAtMillis,
             strictModeRemainingMillis = strictModeManager.remainingMillis(strictState),
@@ -116,6 +117,9 @@ data class SettingsUiState(
     val instagramFeedBlockingEnabled: Boolean = false,
     /** Block All is selected, so the minimal-mode allowlist is what is in force. */
     val allowlistModeSelected: Boolean = false,
+
+    /** Social Media is selected, so the social app list is what is in force. */
+    val socialModeSelected: Boolean = false,
     val strictModeArmed: Boolean = false,
     val strictModeUntilMillis: Long = 0L,
     val strictModeRemainingMillis: Long = 0L,

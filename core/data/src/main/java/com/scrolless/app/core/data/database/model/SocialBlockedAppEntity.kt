@@ -14,19 +14,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.scrolless.app.core.model
+package com.scrolless.app.core.data.database.model
 
-enum class BlockOption {
-    BlockAll,
+import androidx.compose.runtime.Immutable
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
-    /**
-     * Closes whole social apps rather than the short-form surfaces inside them. The list is
-     * seeded from [com.scrolless.app.core.social.SocialApps.DEFAULT_PACKAGES] and edited by
-     * the user. Never rename: Room persists this by name.
-     */
-    SocialMedia,
-    DailyLimit,
-    IntervalTimer,
-    PartnerQuota,
-    NothingSelected,
-}
+/**
+ * One app Social Media mode closes.
+ *
+ * Seeded from [com.scrolless.app.core.social.SocialApps.DEFAULT_PACKAGES] when the table is
+ * created, then owned by the user. Seeding happens once, so unticking an app makes it stay
+ * unticked rather than coming back on the next launch.
+ */
+@Entity(tableName = "social_blocked_apps")
+@Immutable
+data class SocialBlockedAppEntity(@PrimaryKey @ColumnInfo(name = "package_id") val packageId: String)

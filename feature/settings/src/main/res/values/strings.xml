@@ -67,9 +67,11 @@
 
     <string name="minimal_mode_title">Minimal mode</string>
 
-    <string name="minimal_mode_status_on">Active</string>
+    <string name="app_picker_status_on">Active</string>
 
-    <string name="minimal_mode_status_off">Not active</string>
+    <string name="app_picker_status_off">Not active</string>
+
+    <string name="app_picker_loading">Reading the installed apps…</string>
 
     <string name="minimal_mode_enable_description">Block All now means this: while it is the chosen mode, anything outside your allowlist closes itself. Calls, alarms, the home screen, the keyboard and Scrolless always stay available. Short-form content stays blocked inside the apps you do allow.</string>
 
@@ -97,7 +99,15 @@
 
     <string name="minimal_mode_apps_description">Everything unticked closes while Block All is on. Settings is not allowed by default — tick it here if you want it reachable.</string>
 
-    <string name="minimal_mode_loading_apps">Reading the installed apps…</string>
+    <string name="settings_social_apps_title">Social media apps</string>
+
+    <string name="settings_social_apps_description_off">Pick Social Media to close these apps</string>
+
+    <string name="settings_social_apps_description_on">Active — the listed apps close themselves</string>
+
+    <string name="social_apps_title">Social media apps</string>
+
+    <string name="social_apps_description">While Social Media is the chosen mode, every ticked app closes itself. Calls, alarms, the home screen and the keyboard always stay available. YouTube is left unticked on purpose — people use it for more than scrolling, and its Shorts stay blocked anyway.</string>
 
     <string name="settings_section_strict_mode">Strict mode</string>
 

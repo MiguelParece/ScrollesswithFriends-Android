@@ -35,4 +35,12 @@ interface InstalledAppsProvider {
 
     /** Launchable apps sorted by display label. Safe to call off the main thread only. */
     suspend fun launchableApps(): List<InstalledApp>
+
+    /**
+     * Just the package ids, skipping the label lookup that makes [launchableApps] slow.
+     *
+     * The accessibility guard needs this on every kick decision to tell a real app from a
+     * system surface, and loading a label per app for that would be wasteful.
+     */
+    suspend fun launchablePackageIds(): Set<String>
 }

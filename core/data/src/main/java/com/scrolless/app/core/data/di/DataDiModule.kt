@@ -40,6 +40,7 @@ import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
 import com.scrolless.app.core.data.database.dao.MinimalModeAllowedAppDao
 import com.scrolless.app.core.data.database.dao.MinimalModeWindowDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
+import com.scrolless.app.core.data.database.dao.SocialBlockedAppDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
 import com.scrolless.app.core.data.repository.AndroidTimeProvider
 import com.scrolless.app.core.data.repository.MinimalModeStoreImpl
@@ -47,12 +48,14 @@ import com.scrolless.app.core.data.repository.PackageManagerInstalledAppsProvide
 import com.scrolless.app.core.data.repository.RedeemedGiftStoreImpl
 import com.scrolless.app.core.data.repository.SessionSegmentStoreImpl
 import com.scrolless.app.core.data.repository.SessionTrackerImpl
+import com.scrolless.app.core.data.repository.SocialBlocklistStoreImpl
 import com.scrolless.app.core.data.repository.UserSettingsStoreImpl
 import com.scrolless.app.core.repository.InstalledAppsProvider
 import com.scrolless.app.core.repository.MinimalModeStore
 import com.scrolless.app.core.repository.RedeemedGiftStore
 import com.scrolless.app.core.repository.SessionSegmentStore
 import com.scrolless.app.core.repository.SessionTracker
+import com.scrolless.app.core.repository.SocialBlocklistStore
 import com.scrolless.app.core.repository.UserSettingsStore
 import dagger.Module
 import dagger.Provides
@@ -81,6 +84,7 @@ object DataDiModule {
                 ScrollessDatabase.MIGRATION_11_12,
                 ScrollessDatabase.MIGRATION_12_13,
                 ScrollessDatabase.MIGRATION_13_14,
+                ScrollessDatabase.MIGRATION_14_15,
             ).fallbackToDestructiveMigration(true) // Not recommended but for now it shouldn't matter
             .fallbackToDestructiveMigrationOnDowngrade(true).addCallback(
                 object : RoomDatabase.Callback() {
@@ -111,6 +115,9 @@ object DataDiModule {
                                 0, 0, 0, -1)
                         """,
                         )
+                        // A fresh install skips every migration, so the social list is
+                        // seeded here too or it would start empty.
+                        ScrollessDatabase.seedSocialBlockedApps(db)
                     }
                 },
             ).build()
@@ -157,6 +164,15 @@ object DataDiModule {
     @Singleton
     fun provideInstalledAppsProvider(@ApplicationContext context: Context): InstalledAppsProvider =
         PackageManagerInstalledAppsProvider(context = context)
+
+    @Provides
+    @Singleton
+    fun provideSocialBlockedAppDao(database: ScrollessDatabase): SocialBlockedAppDao = database.socialBlockedAppDao()
+
+    @Provides
+    @Singleton
+    fun provideSocialBlocklistStore(socialBlockedAppDao: SocialBlockedAppDao): SocialBlocklistStore =
+        SocialBlocklistStoreImpl(socialBlockedAppDao = socialBlockedAppDao)
 
     @Provides
     @Singleton

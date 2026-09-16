@@ -30,6 +30,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import com.scrolless.app.R
 import com.scrolless.app.core.blocking.BlockingManager
@@ -45,9 +46,12 @@ import com.scrolless.app.core.model.BlockingResult
 import com.scrolless.app.core.model.DetectionMethod
 import com.scrolless.app.core.model.ResolvedBlockableApp
 import com.scrolless.app.core.model.StrictModeState
+import com.scrolless.app.core.repository.InstalledAppsProvider
 import com.scrolless.app.core.repository.MinimalModeStore
 import com.scrolless.app.core.repository.SessionTracker
+import com.scrolless.app.core.repository.SocialBlocklistStore
 import com.scrolless.app.core.repository.UserSettingsStore
+import com.scrolless.app.core.social.SocialApps
 import com.scrolless.app.core.strict.StrictModeManager
 import com.scrolless.app.ui.overlay.TimerOverlayManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -149,6 +153,14 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var minimalModeStore: MinimalModeStore
 
+    /** Tells a real, pickable app from a system surface the user could never allow. */
+    @Inject
+    lateinit var installedAppsProvider: InstalledAppsProvider
+
+    /** Which apps Social Media mode closes. */
+    @Inject
+    lateinit var socialBlocklistStore: SocialBlocklistStore
+
     /** Wall clock, elapsed realtime and boot count, so minimal mode can derive a trusted now. */
     @Inject
     lateinit var timeProvider: TimeProvider
@@ -229,6 +241,21 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
     /** Whether the allowlist is in force right now, recomputed on edges and on events. */
     private var minimalModeWindowOpen: Boolean = false
 
+    private var currentSocialBlockedApps: Set<String> = emptySet()
+
+    /** Social Media mode closes whole apps; unlike the allowlist it has no schedule. */
+    private val isSocialModeSelected: Boolean
+        get() = currentBlockOption == BlockOption.SocialMedia
+
+    /**
+     * Whether any guard is judging foreground packages right now.
+     *
+     * The two guards are mutually exclusive — they are both block options — but they share
+     * everything downstream: the widened package filter, the kick, the toast.
+     */
+    private val packageGuardActive: Boolean
+        get() = minimalModeWindowOpen || isSocialModeSelected
+
     /**
      * Every package answering the home intent. Empty means the launcher could not be
      * resolved, which disables minimal mode rather than risk kicking the home screen.
@@ -237,6 +264,16 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
     /** Current keyboard, so typing in an allowed app is not read as opening a blocked one. */
     private var imePackageId: String? = null
+
+    /**
+     * Every package with a launcher icon — exactly what the app picker can offer.
+     *
+     * Empty until the first query lands, which leaves the guard inert for a moment rather
+     * than risking a kick it cannot justify.
+     */
+    private var launchablePackageIds: Set<String> = emptySet()
+
+    private var lastLaunchableRefreshElapsed: Long = 0L
 
     private var minimalAnchorWall: Long = 0L
     private var minimalAnchorElapsed: Long = 0L
@@ -355,10 +392,15 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
                     currentBlockOption = blockOption
                     blockingManager.init(blockOption)
 
-                    // Block All is also what arms the allowlist, so the package filter and the
-                    // clock anchor have to follow the mode.
+                    // Block All arms the allowlist and Social Media arms the app list, so the
+                    // package filter has to follow the mode either way.
                     if (isAllowlistModeSelected) ensureMinimalModeAnchor()
                     refreshMinimalModeWindow()
+                    refreshServiceConfig()
+                    if (isSocialModeSelected) {
+                        refreshLaunchablePackagesThrottled()
+                        enforceMinimalModeOnForeground()
+                    }
                 }
         }
 
@@ -380,6 +422,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Minimal mode needs to know the home screen and the keyboard before it can kick
         // anything, or it would close the very screens the user needs to recover.
         resolveMinimalModeSystemPackages()
+        serviceScope.launch { refreshLaunchablePackages() }
 
         // Each of these changes what counts as allowed or when, so the window is re-evaluated
         // and — unlike the other content toggles — the package filter itself is refreshed.
@@ -391,6 +434,9 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         }
         serviceScope.launch {
             minimalModeStore.getAllowedApps().collect { currentMinimalModeAllowedApps = it }
+        }
+        serviceScope.launch {
+            socialBlocklistStore.getBlockedApps().collect { currentSocialBlockedApps = it }
         }
         serviceScope.launch {
             userSettingsStore.getMinimalAnchorWall().collect {
@@ -540,8 +586,15 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // Minimal mode closes anything outside the allowlist. It sits above the early return
         // below because an arbitrary app is not a BlockableApp, so nothing past this point
         // would ever see it.
-        if (minimalModeWindowOpen && !minimalModeAllows(packageId) && handleMinimalModeEvent(packageId)) {
-            return
+        if (packageGuardActive) {
+            // A package nobody has heard of may simply have been installed since the last
+            // look, so refresh before the allowlist writes it off as a system surface.
+            if (minimalModeWindowOpen && packageId.isNotBlank() && packageId !in launchablePackageIds) {
+                refreshLaunchablePackagesThrottled()
+            }
+            if (shouldClosePackage(packageId) && handleMinimalModeEvent(packageId)) {
+                return
+            }
         }
 
         // For unrelated apps, avoid touching the accessibility tree unless we're already tracking
@@ -860,9 +913,13 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
      */
     private suspend fun usedMillisAgainstActiveLimit(): Long = when (currentBlockOption) {
         BlockOption.IntervalTimer -> userSettingsStore.getIntervalUsage().first()
+
         BlockOption.PartnerQuota -> userSettingsStore.getPartnerQuotaUsedMillis().first()
+
         BlockOption.DailyLimit -> sessionTracker.getDailyUsage()
-        BlockOption.BlockAll, BlockOption.NothingSelected -> 0L
+
+        // Neither mode rations time, so the overlay starts from zero.
+        BlockOption.BlockAll, BlockOption.SocialMedia, BlockOption.NothingSelected -> 0L
     }
 
     /**
@@ -984,7 +1041,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         val info = serviceInfo ?: return
         val strictArmed = strictModeManager.isArmed(strictModeState)
 
-        if (listenToAll || minimalModeWindowOpen) {
+        if (listenToAll || packageGuardActive) {
             // Minimal mode has to see apps it has never heard of, so the filter comes off for
             // as long as a window is open — and goes straight back on when it closes.
             info.packageNames = null // Listen to all
@@ -1007,7 +1064,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // app, which is the whole battery cost of minimal mode. Classifying the foreground app
         // only needs window transitions, so content events are dropped while a window is open
         // and nothing is being tracked.
-        info.eventTypes = if (minimalModeWindowOpen && !listenToAll) {
+        info.eventTypes = if (packageGuardActive && !listenToAll) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
         } else {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
@@ -1138,12 +1195,33 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         else -> MinimalModeSchedule.isOpen(currentMinimalModeWindows, minuteOfDay(trustedNowMillis()))
     }
 
+    /**
+     * Whether the active guard wants [packageId] gone.
+     *
+     * Block All asks "is this allowed"; Social Media asks "is this on the list". Only one can
+     * be active, since they are block options.
+     */
+    private fun shouldClosePackage(packageId: String): Boolean = when {
+        minimalModeWindowOpen -> !minimalModeAllows(packageId)
+
+        isSocialModeSelected -> SocialApps.blocks(
+            packageId = packageId,
+            blockedPackages = currentSocialBlockedApps,
+            launcherPackageIds = launcherPackageIds,
+            imePackageId = imePackageId,
+            ownPackageId = packageName,
+        )
+
+        else -> false
+    }
+
     private fun minimalModeAllows(packageId: String): Boolean = MinimalModeAllowlist.allows(
         packageId = packageId,
         userAllowed = currentMinimalModeAllowedApps,
         launcherPackageIds = launcherPackageIds,
         imePackageId = imePackageId,
         ownPackageId = packageName,
+        launchablePackageIds = launchablePackageIds,
     )
 
     /**
@@ -1166,6 +1244,7 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // so the foreground has to be checked directly or the app would survive the edge.
         if (open) {
             resolveMinimalModeSystemPackages()
+            refreshLaunchablePackagesThrottled()
             enforceMinimalModeOnForeground()
         }
     }
@@ -1195,9 +1274,37 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         minimalModeHandler.postDelayed(minimalModeTransitionRunnable, delay)
     }
 
+    /**
+     * Whether the focused window belongs to an app rather than to the system.
+     *
+     * Returns true when the window list is unavailable: the launcher-icon rule is the real
+     * protection here, and refusing to act on missing window info would disable the guard on
+     * any device that does not report windows.
+     */
+    private fun isApplicationWindowFocused(): Boolean {
+        val focused = windows.orEmpty().firstOrNull { it.isFocused } ?: return true
+        return focused.type == AccessibilityWindowInfo.TYPE_APPLICATION
+    }
+
+    private fun refreshLaunchablePackagesThrottled() {
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (nowElapsed - lastLaunchableRefreshElapsed < LAUNCHABLE_REFRESH_MIN_INTERVAL_MILLIS) return
+        lastLaunchableRefreshElapsed = nowElapsed
+        serviceScope.launch { refreshLaunchablePackages() }
+    }
+
+    private suspend fun refreshLaunchablePackages() {
+        launchablePackageIds = try {
+            installedAppsProvider.launchablePackageIds()
+        } catch (e: Exception) {
+            Timber.e(e, "Minimal mode: could not list launchable apps, guard stays inert")
+            emptySet()
+        }
+    }
+
     private fun enforceMinimalModeOnForeground() {
         val activePackage = rootInActiveWindow?.packageName?.toString() ?: return
-        if (minimalModeAllows(activePackage)) return
+        if (!shouldClosePackage(activePackage)) return
         kickFromMinimalMode(activePackage)
     }
 
@@ -1209,6 +1316,11 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
         // another app owns the screen. Acting on those would close the allowed app underneath.
         val activePackage = rootInActiveWindow?.packageName?.toString()
         if (activePackage != null && activePackage != packageId) return false
+
+        // Second line of defence behind the launcher-icon rule: fingerprint and face prompts,
+        // permission dialogs and system pickers are not application windows, and closing one
+        // takes down the app that asked for it.
+        if (!isApplicationWindowFocused()) return false
 
         kickFromMinimalMode(packageId)
 
@@ -1435,5 +1547,8 @@ class ScrollessBlockAccessibilityService : AccessibilityService() {
 
         /** Floor on the edge alarm so a rounding error cannot spin the handler. */
         const val MINIMAL_TRANSITION_MIN_DELAY_MILLIS = 1_000L
+
+        /** Listing launcher entries is not free, so an unknown package refreshes at most this often. */
+        const val LAUNCHABLE_REFRESH_MIN_INTERVAL_MILLIS = 10_000L
     }
 }

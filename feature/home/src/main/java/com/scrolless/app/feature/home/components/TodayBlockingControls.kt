@@ -100,7 +100,7 @@ import java.time.LocalDateTime
 import kotlinx.coroutines.delay
 import timber.log.Timber
 
-enum class BlockingButtonType { BLOCK_ALL, DAILY_LIMIT, INTERVAL, PARTNER_QUOTA }
+enum class BlockingButtonType { BLOCK_ALL, SOCIAL_MEDIA, DAILY_LIMIT, INTERVAL, PARTNER_QUOTA }
 
 @Composable
 fun TodayBlockingControls(
@@ -138,11 +138,13 @@ fun TodayBlockingControls(
     val dailyLimitInteractionSource = remember { MutableInteractionSource() }
     val intervalInteractionSource = remember { MutableInteractionSource() }
     val partnerQuotaInteractionSource = remember { MutableInteractionSource() }
+    val socialMediaInteractionSource = remember { MutableInteractionSource() }
 
     val isBlockAllPressed by blockAllInteractionSource.collectIsPressedAsState()
     val isDailyLimitPressed by dailyLimitInteractionSource.collectIsPressedAsState()
     val isIntervalPressed by intervalInteractionSource.collectIsPressedAsState()
     val isPartnerQuotaPressed by partnerQuotaInteractionSource.collectIsPressedAsState()
+    val isSocialMediaPressed by socialMediaInteractionSource.collectIsPressedAsState()
 
     // Helper to evaluate target weight based on click/press states
     fun isPressedOrClicked(button: BlockingButtonType): Boolean = when (button) {
@@ -150,6 +152,7 @@ fun TodayBlockingControls(
         BlockingButtonType.DAILY_LIMIT -> isDailyLimitPressed || lastClicked == BlockingButtonType.DAILY_LIMIT
         BlockingButtonType.INTERVAL -> isIntervalPressed || lastClicked == BlockingButtonType.INTERVAL
         BlockingButtonType.PARTNER_QUOTA -> isPartnerQuotaPressed || lastClicked == BlockingButtonType.PARTNER_QUOTA
+        BlockingButtonType.SOCIAL_MEDIA -> isSocialMediaPressed || lastClicked == BlockingButtonType.SOCIAL_MEDIA
     }
 
     fun weightFor(button: BlockingButtonType): Float = when {
@@ -177,6 +180,11 @@ fun TodayBlockingControls(
     val partnerQuotaWeight by animateFloatAsState(
         targetValue = weightFor(BlockingButtonType.PARTNER_QUOTA),
         animationSpec = pressAnimationSpec, label = "partnerQuotaWeight",
+    )
+
+    val socialMediaWeight by animateFloatAsState(
+        targetValue = weightFor(BlockingButtonType.SOCIAL_MEDIA),
+        animationSpec = pressAnimationSpec, label = "socialMediaWeight",
     )
 
     Column(
@@ -235,14 +243,28 @@ fun TodayBlockingControls(
                 Timber.i("PartnerQuota clicked -> newOption=%s (prev=%s)", newOption, uiState.blockOption)
                 onBlockOptionSelected(newOption)
             },
+            onSocialMediaClick = {
+                lastClicked = BlockingButtonType.SOCIAL_MEDIA
+                val isSelected = uiState.blockOption == BlockOption.SocialMedia
+                hapticFeedback.playToggle(!isSelected)
+                val newOption = if (isSelected) {
+                    BlockOption.NothingSelected
+                } else {
+                    BlockOption.SocialMedia
+                }
+                Timber.i("SocialMedia clicked -> newOption=%s (prev=%s)", newOption, uiState.blockOption)
+                onBlockOptionSelected(newOption)
+            },
             blockAllInteractionSource = blockAllInteractionSource,
             dailyLimitInteractionSource = dailyLimitInteractionSource,
             intervalInteractionSource = intervalInteractionSource,
             partnerQuotaInteractionSource = partnerQuotaInteractionSource,
+            socialMediaInteractionSource = socialMediaInteractionSource,
             blockAllAnimatedWeight = blockAllWeight,
             dailyLimitAnimatedWeight = dailyLimitWeight,
             intervalAnimatedWeight = intervalWeight,
             partnerQuotaAnimatedWeight = partnerQuotaWeight,
+            socialMediaAnimatedWeight = socialMediaWeight,
             strictModeArmed = uiState.strictModeArmed,
         )
 
@@ -685,14 +707,17 @@ fun FeatureButtonsRow(
     onDailyLimitClick: () -> Unit,
     onIntervalTimerClick: () -> Unit,
     onPartnerQuotaClick: () -> Unit,
+    onSocialMediaClick: () -> Unit,
     blockAllInteractionSource: MutableInteractionSource,
     dailyLimitInteractionSource: MutableInteractionSource,
     intervalInteractionSource: MutableInteractionSource,
     partnerQuotaInteractionSource: MutableInteractionSource,
+    socialMediaInteractionSource: MutableInteractionSource,
     blockAllAnimatedWeight: Float,
     dailyLimitAnimatedWeight: Float,
     intervalAnimatedWeight: Float,
     partnerQuotaAnimatedWeight: Float,
+    socialMediaAnimatedWeight: Float,
     modifier: Modifier = Modifier,
     strictModeArmed: Boolean = false,
 ) {
@@ -722,6 +747,22 @@ fun FeatureButtonsRow(
                     interactionSource = blockAllInteractionSource,
                     isEnabled = isOptionAvailable(BlockOption.BlockAll),
                     modifier = Modifier.weight(blockAllAnimatedWeight),
+                )
+            },
+            menuContent = {},
+        )
+
+        customItem(
+            buttonGroupContent = {
+                FeatureButton(
+                    onClick = onSocialMediaClick,
+                    icon = R.drawable.ic_social_media,
+                    text = stringResource(id = R.string.social_media),
+                    contentDescription = stringResource(id = R.string.social_media),
+                    isSelected = selectedOption == BlockOption.SocialMedia,
+                    interactionSource = socialMediaInteractionSource,
+                    isEnabled = isOptionAvailable(BlockOption.SocialMedia),
+                    modifier = Modifier.weight(socialMediaAnimatedWeight),
                 )
             },
             menuContent = {},

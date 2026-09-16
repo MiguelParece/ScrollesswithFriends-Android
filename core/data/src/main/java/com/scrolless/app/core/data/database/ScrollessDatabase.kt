@@ -25,12 +25,15 @@ import com.scrolless.app.core.data.database.dao.MinimalModeAllowedAppDao
 import com.scrolless.app.core.data.database.dao.MinimalModeWindowDao
 import com.scrolless.app.core.data.database.dao.RedeemedGiftDao
 import com.scrolless.app.core.data.database.dao.SessionSegmentDao
+import com.scrolless.app.core.data.database.dao.SocialBlockedAppDao
 import com.scrolless.app.core.data.database.dao.UserSettingsDao
 import com.scrolless.app.core.data.database.model.MinimalModeAllowedAppEntity
 import com.scrolless.app.core.data.database.model.MinimalModeWindowEntity
 import com.scrolless.app.core.data.database.model.RedeemedGiftEntity
 import com.scrolless.app.core.data.database.model.SessionSegmentEntity
+import com.scrolless.app.core.data.database.model.SocialBlockedAppEntity
 import com.scrolless.app.core.data.database.model.UserSettingsEntity
+import com.scrolless.app.core.social.SocialApps
 
 /**
  * The [RoomDatabase]
@@ -42,8 +45,9 @@ import com.scrolless.app.core.data.database.model.UserSettingsEntity
         RedeemedGiftEntity::class,
         MinimalModeAllowedAppEntity::class,
         MinimalModeWindowEntity::class,
+        SocialBlockedAppEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 @TypeConverters(LocalDateTypeConverters::class, BlockableAppTypeConverters::class, LocalDateTimeTypeConverters::class)
@@ -57,6 +61,8 @@ abstract class ScrollessDatabase : RoomDatabase() {
     abstract fun minimalModeAllowedAppDao(): MinimalModeAllowedAppDao
 
     abstract fun minimalModeWindowDao(): MinimalModeWindowDao
+
+    abstract fun socialBlockedAppDao(): SocialBlockedAppDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -331,6 +337,32 @@ abstract class ScrollessDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
+            }
+        }
+
+        /** Social Media mode: the app list, seeded once from the curated default. */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS social_blocked_apps (
+                        package_id TEXT NOT NULL,
+                        PRIMARY KEY(package_id)
+                    )
+                    """.trimIndent(),
+                )
+                seedSocialBlockedApps(db)
+            }
+        }
+
+        /**
+         * Inserts the curated defaults, reading them from the Kotlin list rather than
+         * repeating them in SQL so the two cannot drift apart. Runs once, at table creation:
+         * unticking an app has to stay unticked.
+         */
+        fun seedSocialBlockedApps(db: SupportSQLiteDatabase) {
+            SocialApps.DEFAULT_PACKAGES.forEach { packageId ->
+                db.execSQL("INSERT OR IGNORE INTO social_blocked_apps (package_id) VALUES (?)", arrayOf<Any>(packageId))
             }
         }
     }
